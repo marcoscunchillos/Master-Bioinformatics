@@ -1,0 +1,104 @@
+---
+title: "PEC1"
+author: "Marcos Cunchillos Just"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+#Sección 1. Importación, exportación y gestión de datos
+El objetivo de esta sección es conocer la sintaxis en R para importar y exportar diferentes
+tipos de archivos de datos y cómo visualizarlos desde RStudio, así como acceder a
+conjuntos de datos de diferentes fuentes y entornos. Esta primera parte corresponde al paso
+inicial de un estudio de análisis de datos.
+
+##Ejercicio 1
+A partir del archivo heart.csv sobre enfermedades cardíacas:
+
+###1.1. Importe los datos del archivo en un data frame llamado HeartStat y muestre los 6 primeros registros (head) y los 6 últimos (tail).
+```{r}
+library(readr)
+HeartStat <- read_csv("data/heart.csv")
+#6 primeros registros
+head(HeartStat)
+#6 últimos registros
+tail(HeartStat)
+```
+
+####1.2. Describa las características del conjunto de datos: nombre de las variables, tipos de datos, tamaño de la muestra (número de filas y columnas) y prospección de valores nulos. Proponga qué tipo de análisis exploratorio y gráficos serán adecuados según la naturaleza de las variables.
+```{r}
+#Nombre de las variables y tipo de datos
+str(HeartStat)
+#Tamaño de la muestra
+dim(HeartStat)
+#Prospección de valores nulos
+any(is.na(HeartStat))
+sapply(HeartStat, is.null)
+```
+Todos los datos son númericos, por lo que el análisis debería de ser cuantitativo.
+
+###1.3. Supongamos que en este dataset detectamos valores ausentes en una variable. La práctica habitual de "eliminar todas las filas con un valor ausente" (complete-case analysis) puede introducir un sesgo. Explique qué riesgo puede comportar descartar sistemáticamente a pacientes que no tienen el expediente médico completo. 10-15 líneas.
+El principal riesgo del análisis de casos completos es introducir un importante sesgo de selección, ya que se estaría asumiendo (normalmente) erróneamente que los datos faltan de forma aleatoria. Al descartar pacientes con expedientes incompletos, se excluye sistemáticamente a los individuos más graves que no logran tolerar o terminar las pruebas, lo que subestima la severidad real de la patología. Asimismo, se ocultan los fracasos terapéuticos al eliminar a quienes abandonan el seguimiento por sufrir efectos secundarios severos, sobrestimando artificialmente la seguridad y eficacia del tratamiento. Esta práctica también invisibiliza a las poblaciones socioeconómicamente vulnerables, cuyos historiales suelen estar fragmentados por un peor acceso continuo al sistema de salud. Además de este sesgo, a nivel matemático, la reducción de la muestra reduce también la potencia estadística y eleva el riesgo de no detectar efectos reales. En consecuencia, el estudio pierde su validez externa y deja de representar a la población general, haciendo necesario el uso de métodos más seguros como la imputación múltiple.
+
+##Ejercicio 2
+En este ejercicio se trabajará con el conjunto de datos esoph del paquete nativo datasets de
+R, que contiene datos de un estudio de casos y controles sobre cáncer de esófago en
+Francia.
+###2.1.Explique qué información contiene el conjunto de datos esoph y sus características más relevantes. Sugiera y justifique alguna acción de preparación o transformación de los datos (p. ej., creación de nuevas variables categóricas o agrupación de niveles de consumo de tabaco/alcohol).
+```{r}
+data("esoph")
+head(esoph)
+str(esoph)
+```
+El conjunto de datos `esoph` procede de un estudio de casos y controles sobre cáncer de esófago realizado en Ille-et-Vilaine (Francia). Los datos están **agregados**: cada fila no es una persona, sino una combinación de grupo de edad, consumo de alcohol y consumo de tabaco, con el número de casos y de controles de ese grupo. Contiene 88 filas y 5 variables:
+
+- `agegp`: grupo de edad (factor ordenado, 6 niveles).
+- `alcgp`: consumo diario de alcohol en gramos (factor ordenado, 4 niveles).
+- `tobgp`: consumo diario de tabaco en gramos (factor ordenado, 4 niveles).
+- `ncases`: número de casos (pacientes con cáncer de esófago).
+- `ncontrols`: número de controles (personas sanas).
+
+Sus características más relevantes son que las tres variables explicativas son factores ordenados, lo que permite estudiar la relación dosis-respuesta entre consumo y riesgo, y que, al ser datos agregados, cada fila contiene un número distinto de personas, por lo que las filas no tienen el mismo peso.
+
+**Preparación propuesta.** Se crean dos tipos de variables nuevas:
+
+1. `n_total` y `case_prop`: el total de personas por fila y la proporción de casos. Permiten comparar combinaciones de riesgo con una sola variable en lugar de dos conteos.
+2. `alc_group` y `tob_group`: agrupación de los niveles de consumo en dos categorías (bajo y alto). Se toma como consumo alto el alcohol a partir de 80 g/día y el tabaco a partir de 20 g/día, umbrales habituales para definir un consumo elevado. La agrupación reduce el número de categorías, lo que facilita tablas y modelos cuando hay pocos casos por combinación, a costa de perder parte del detalle.
+
+###2.2. Exporte el data frame esoph modificado a un archivo en formato .csv (llamado esoph_modificat.csv) especificando la ruta de destino y asegurándose de no incluir el índice de filas.
+```{r}
+# Work on a copy so the original dataset is untouched
+esoph_modified <- esoph
+
+# Total number of people and proportion of cases in each row
+esoph_modified$n_total   <- esoph_modified$ncases + esoph_modified$ncontrols
+esoph_modified$case_prop <- esoph_modified$ncases / esoph_modified$n_total
+
+# Collapse the ordered factors into two levels:
+esoph_modified$alc_group <- factor(ifelse(as.integer(esoph_modified$alcgp) >= 3,
+                                          "High", "Low"),
+                                   levels = c("Low", "High"))
+
+esoph_modified$tob_group <- factor(ifelse(as.integer(esoph_modified$tobgp) >= 3,
+                                          "High", "Low"),
+                                   levels = c("Low", "High"))
+
+str(esoph_modified)
+
+# Create the destination folder if it does not exist
+dir.create("output", showWarnings = FALSE)
+
+# row.names = FALSE avoids writing the row index as an extra column
+write.csv(esoph_modified,
+          file = file.path("output", "esoph_modificat.csv"),
+          row.names = FALSE)
+```
+
+
+###2.3. El dataset esoph recoge información sobre hábitos de consumo de alcohol y tabaco relacionados con una enfermedad grave. Cuando los algoritmos de salud utilizan datos de estilo de vida para evaluar riesgos o priorizar tratamientos, ¿cuál es el límite ético entre la prevención médica y la discriminación o estigmatización de determinados colectivos? 10-15 líneas.
+El límite entre prevención y discriminación, en mi opinión está en para qué se usa el dato y qué consecuencias tiene para la persona. Un algoritmo que detecta a quien bebe o fuma mucho para ofrecerle cribados, información o programas de apoyo hace prevención, por lo que el resultado le beneficia y es voluntario. Es discriminación cuando ese mismo perfil sirve para negarle un tratamiento, retrasarlo, encarecerle un seguro o culpabilizarle de su enfermedad. 
+
+Además, los hábitos de vida no son solo una elección libre. El alcohol y el tabaco se relacionan con la clase social, el estrés, el entorno laboral y el acceso a la sanidad, así que un algoritmo que penalice esas variables puede acabar penalizando la pobreza y reforzando desigualdades previas. Por eso creo que deben cumplirse varias condiciones. Principalmente, usar los datos para ayudar y no para excluir, ser transparente sobre qué variables pesan en la decisión, mantener siempre una persona que revise y pueda corregir al algoritmo, y proteger estos datos como información sanitaria sensible, como exige la ley. Además la prevención debe respetar la autonomía del paciente, la discriminación la sustituye por un juicio automático sobre su estilo de vida.
