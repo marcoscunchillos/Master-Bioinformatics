@@ -102,3 +102,59 @@ write.csv(esoph_modified,
 El límite entre prevención y discriminación, en mi opinión está en para qué se usa el dato y qué consecuencias tiene para la persona. Un algoritmo que detecta a quien bebe o fuma mucho para ofrecerle cribados, información o programas de apoyo hace prevención, por lo que el resultado le beneficia y es voluntario. Es discriminación cuando ese mismo perfil sirve para negarle un tratamiento, retrasarlo, encarecerle un seguro o culpabilizarle de su enfermedad. 
 
 Además, los hábitos de vida no son solo una elección libre. El alcohol y el tabaco se relacionan con la clase social, el estrés, el entorno laboral y el acceso a la sanidad, así que un algoritmo que penalice esas variables puede acabar penalizando la pobreza y reforzando desigualdades previas. Por eso creo que deben cumplirse varias condiciones. Principalmente, usar los datos para ayudar y no para excluir, ser transparente sobre qué variables pesan en la decisión, mantener siempre una persona que revise y pueda corregir al algoritmo, y proteger estos datos como información sanitaria sensible, como exige la ley. Además la prevención debe respetar la autonomía del paciente, la discriminación la sustituye por un juicio automático sobre su estilo de vida.
+
+#Sección 2: Análisis básico del conjunto de datos
+El objetivo de esta sección es obtener información sobre un conjunto de datos determinado, realizando diversas operaciones y consultas.
+
+##Ejercicio 3
+Considerando el data frame HeartStat, resuelva las siguientes cuestiones (incluya código y resultados):
+###3.1. Calcule la proporción de pacientes según el tipo de dolor torácico (cp), agrupados por la presencia o ausencia de enfermedad cardíaca (target). Comente los resultados.
+```{r}
+# Recuento de los tipos de dolor torácico (filas) en función de la presencia o ausencia de enfermedad cardiaca (columnas)
+tab_cp <- table(HeartStat$cp, HeartStat$target)
+tab_cp
+
+# Proporciones agrupadas según ausencia o presencia de enfermedad cardiaca
+prop_cp <- prop.table(tab_cp, margin = 2)
+round(prop_cp, 3)
+```
+
+###3.2. Muestre la relación entre el sexo de los pacientes (sex: 1 = hombre, 0 = mujer) y la presencia de enfermedad cardíaca (target). Represente un gráfico de barras que compare estas proporciones.
+```{r}
+library(ggplot2)
+
+# Renombrar las variables númericas en factores etiquetados
+HeartStat$sex_f    <- factor(HeartStat$sex,    levels = c(0, 1),
+                             labels = c("Mujer", "Hombre"))
+HeartStat$target_f <- factor(HeartStat$target, levels = c(0, 1),
+                             labels = c("Sano", "Enfermo"))
+
+# Contarlos pacientes por sexo y presencia/ausencia de enfermedad
+tab_sex <- table(Sexo = HeartStat$sex_f, Salud = HeartStat$target_f)
+
+# Proporción de pacientes con y sin enfermedad por sexo 
+prop_sex <- prop.table(tab_sex, margin = 1)
+round(prop_sex, 3)
+
+# Convertir la tabla en un data frame para hacer una gráfica con ggplot
+df_sex <- as.data.frame(prop_sex, responseName = "Proporción")
+
+# Crear la gráfica
+ggplot(df_sex, aes(x = Sexo, y = Proporción, fill = Salud)) +
+  geom_col(colour = "black") +
+  ylim(0, 1) +
+  labs(x = "Sexo", y = "Proporción de pacientes",
+       fill = "Salud cardiaca", title = "Enfermedades cardiacas por sexo")
+```
+
+###3.3. Evalúe la presencia de enfermedad cardíaca según los niveles de azúcar en sangre en ayunas (fbs), contando el número absoluto de pacientes por cada categoría.
+```{r}
+tab_fbs <- table(fbs = HeartStat$fbs, target = HeartStat$target)
+tab_fbs
+```
+
+###3.4. Muestre en una tabla el número de pacientes con diagnóstico positivo de enfermedad cardíaca, agrupados por tipo de angina de esfuerzo (exang), que sean hombres y cuya presión arterial en reposo sea superior a la media de la muestra.
+
+
+###3.5. En muchos modelos aplicados a la cardiología, la variable "sexo" o "etnia" mejora la capacidad predictiva del modelo, pero puede generar sesgos de atención si el modelo se ha entrenado mayoritariamente con un solo perfil de paciente (por ejemplo, hombres de mediana edad). ¿Qué precauciones deberían tomarse antes de implementar un algoritmo de ayuda al diagnóstico cardíaco en un hospital real?
+
