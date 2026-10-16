@@ -108,7 +108,7 @@ El objetivo de esta sección es obtener información sobre un conjunto de datos 
 
 ##Ejercicio 3
 Considerando el data frame HeartStat, resuelva las siguientes cuestiones (incluya código y resultados):
-###3.1. Calcule la proporción de pacientes según el tipo de dolor torácico (cp), agrupados por la presencia o ausencia de enfermedad cardíaca (target). Comente los resultados.
+###3.1.Calcule la proporción de pacientes según el tipo de dolor torácico (cp), agrupados por la presencia o ausencia de enfermedad cardíaca (target). Comente los resultados.
 ```{r}
 # Recuento de los tipos de dolor torácico (filas) en función de la presencia o ausencia de enfermedad cardiaca (columnas)
 tab_cp <- table(HeartStat$cp, HeartStat$target)
@@ -119,7 +119,7 @@ prop_cp <- prop.table(tab_cp, margin = 2)
 round(prop_cp, 3)
 ```
 
-###3.2. Muestre la relación entre el sexo de los pacientes (sex: 1 = hombre, 0 = mujer) y la presencia de enfermedad cardíaca (target). Represente un gráfico de barras que compare estas proporciones.
+###3.2.Muestre la relación entre el sexo de los pacientes (sex: 1 = hombre, 0 = mujer) y la presencia de enfermedad cardíaca (target). Represente un gráfico de barras que compare estas proporciones.
 ```{r}
 library(ggplot2)
 
@@ -147,14 +147,57 @@ ggplot(df_sex, aes(x = Sexo, y = Proporción, fill = Salud)) +
        fill = "Salud cardiaca", title = "Enfermedades cardiacas por sexo")
 ```
 
-###3.3. Evalúe la presencia de enfermedad cardíaca según los niveles de azúcar en sangre en ayunas (fbs), contando el número absoluto de pacientes por cada categoría.
+###3.3.Evalúe la presencia de enfermedad cardíaca según los niveles de azúcar en sangre en ayunas (fbs), contando el número absoluto de pacientes por cada categoría.
 ```{r}
 tab_fbs <- table(fbs = HeartStat$fbs, target = HeartStat$target)
 tab_fbs
 ```
 
-###3.4. Muestre en una tabla el número de pacientes con diagnóstico positivo de enfermedad cardíaca, agrupados por tipo de angina de esfuerzo (exang), que sean hombres y cuya presión arterial en reposo sea superior a la media de la muestra.
+###3.4.Muestre en una tabla el número de pacientes con diagnóstico positivo de enfermedad cardíaca, agrupados por tipo de angina de esfuerzo (exang), que sean hombres y cuya presión arterial en reposo sea superior a la media de la muestra.
+```{r}
+mean_bps<-mean(HeartStat$trestbps)
+
+angina<-subset(HeartStat,
+               sex == 1 & trestbps > mean_bps & target == 1)
+
+tabla_angina<-table(angina$exang)
+tabla_angina
+```
+
+###3.5.En muchos modelos aplicados a la cardiología, la variable "sexo" o "etnia" mejora la capacidad predictiva del modelo, pero puede generar sesgos de atención si el modelo se ha entrenado mayoritariamente con un solo perfil de paciente (por ejemplo, hombres de mediana edad). ¿Qué precauciones deberían tomarse antes de implementar un algoritmo de ayuda al diagnóstico cardíaco en un hospital real?
+Deberíamos de asegurarnos de que el conjunto de datos que se ha utilizado para entrenar a ese algoritmo, contiene información médica de toda la variedad de personas que lo van a utilizar (diferentes sexos y etnias) en cantidades similares.
+
+#Sección 3: Estadística descriptiva y gráficos (4 puntos)
+El objetivo de este apartado es trabajar los conceptos de estadística descriptiva y de representación de gráficos.
+
+##Ejercicio 4
+Considerando el data frame HeartStat, resuelva las siguientes cuestiones (incluya código y resultados):
+###4.1.Obtenga las principales estadísticas descriptivas (media, desviación estándar, mediana, cuartiles y rango intercuartílico) de las variables cuantitativas continuas del dataset (age, trestbps, chol, thalach). Comente los resultados destacando si observa asimetría o valores atípicos.
+```{r}
+
+```
 
 
-###3.5. En muchos modelos aplicados a la cardiología, la variable "sexo" o "etnia" mejora la capacidad predictiva del modelo, pero puede generar sesgos de atención si el modelo se ha entrenado mayoritariamente con un solo perfil de paciente (por ejemplo, hombres de mediana edad). ¿Qué precauciones deberían tomarse antes de implementar un algoritmo de ayuda al diagnóstico cardíaco en un hospital real?
+###4.2.Realice un diagrama de cajas que relacione la frecuencia cardíaca máxima alcanzada con la presencia o ausencia de enfermedad cardíaca. ¿Qué conclusión puede extraer?
+```{r}
+
+```
+
+
+###4.3.Construya una tabla de frecuencias cruzadas que relacione el resultado del electrocardiograma en reposo con la presencia de enfermedad cardíaca. A continuación, represente esta información mediante un mapa de calor (heatmap) para identificar visualmente qué patrones son los más frecuentes.
+```{r}
+
+```
+
+
+###4.4.Represente un histograma de la variable nivel de colesterol (chol) para los pacientes con enfermedad cardíaca. Superponga la curva de densidad empírica y la curva de densidad normal teórica. Evalúe si la variable sigue una distribución normal y comente el resultado.
+```{r}
+
+```
+
+
+###4.5.Calcule la matriz de correlación lineal entre las variables cuantitativas del dataset y represéntela mediante un gráfico de correlación. Comente qué dos variables muestran la correlación más fuerte (positiva o negativa) e interprete su significado clínico.
+```{r}
+
+```
 
