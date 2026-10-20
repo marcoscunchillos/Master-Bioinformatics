@@ -174,30 +174,65 @@ El objetivo de este apartado es trabajar los conceptos de estadística descripti
 Considerando el data frame HeartStat, resuelva las siguientes cuestiones (incluya código y resultados):
 ###4.1.Obtenga las principales estadísticas descriptivas (media, desviación estándar, mediana, cuartiles y rango intercuartílico) de las variables cuantitativas continuas del dataset (age, trestbps, chol, thalach). Comente los resultados destacando si observa asimetría o valores atípicos.
 ```{r}
-
+summary(HeartStat)
 ```
 
 
 ###4.2.Realice un diagrama de cajas que relacione la frecuencia cardíaca máxima alcanzada con la presencia o ausencia de enfermedad cardíaca. ¿Qué conclusión puede extraer?
 ```{r}
+HeartStat$target_f <- factor(HeartStat$target, levels = c(0, 1),
+                             labels = c("Sano", "Enfermo"))
 
-```
+ggplot(HeartStat, aes(x = target_f, y = thalach, fill = target_f)) +
+  geom_boxplot() +
+  labs(x = "Enfermedad cardiaca", y = "Frecuencia cardiaca máxima")
 
+tapply(HeartStat$thalach, HeartStat$target_f, median)
+    ```
+El diagrama de cajas muestra que los pacientes con enfermedad cardíaca alcanzan una frecuencia cardíaca máxima menor (mediana de 141.5 lpm) que los pacientes sin enfermedad (mediana de 161.0 lpm). Las cajas se solapan poco, por lo que la diferencia es clara. Esto sugiere que una menor capacidad de elevar la frecuencia cardíaca durante el esfuerzo se asocia con la presencia de enfermedad cardíaca. 
 
 ###4.3.Construya una tabla de frecuencias cruzadas que relacione el resultado del electrocardiograma en reposo con la presencia de enfermedad cardíaca. A continuación, represente esta información mediante un mapa de calor (heatmap) para identificar visualmente qué patrones son los más frecuentes.
 ```{r}
-
+frec_cruz <- table(ECG = HeartStat$restecg, Enfermedad = HeartStat$target)
+df_cruz <- as.data.frame(frec_cruz) 
+ggplot(df_cruz, aes(x = Enfermedad, y = ECG, fill = Freq))+
+  labs(x = "Enfermedad", y = "Electrocardiograma en reposo")+
+  geom_tile(colour = "white") +
+  geom_text(aes(label = Freq)) +
+  scale_fill_gradient(low = "lightyellow", high = "tomato")
+  
 ```
 
 
 ###4.4.Represente un histograma de la variable nivel de colesterol (chol) para los pacientes con enfermedad cardíaca. Superponga la curva de densidad empírica y la curva de densidad normal teórica. Evalúe si la variable sigue una distribución normal y comente el resultado.
 ```{r}
+enfermos <- subset(HeartStat,target==1)
+chol_enf <- enfermos$chol
+
+hist(chol_enf,             
+     freq   = FALSE,
+     breaks = 20,
+     col    = "lightblue",
+     border = "black",
+     xlab   = "Colesterol (mg/dl)",
+     ylab   = "Densidad",
+     main   = "Colesterol en pacientes con enfermedad cardiaca")
+
+shapiro.test(chol_enf)
+qqnorm(chol_enf)
+qqline(chol_enf)
 
 ```
-
+El histograma con las curvas de densidad empírica y normal teórica muestra un ajuste razonable, y el gráfico Q-Q presenta los puntos alineados con la recta teórica, con pequeñas desviaciones en las colas. El test de Shapiro-Wilk (W = 0.986, p = 0.256) no permite rechazar la hipótesis de normalidad. Por tanto, el nivel de colesterol en los pacientes con enfermedad cardíaca puede considerarse aproximadamente normal.
 
 ###4.5.Calcule la matriz de correlación lineal entre las variables cuantitativas del dataset y represéntela mediante un gráfico de correlación. Comente qué dos variables muestran la correlación más fuerte (positiva o negativa) e interprete su significado clínico.
 ```{r}
-
+var_num <- subset(HeartStat,select = -c(sex,cp,fbs,restecg,exang,slope,ca,thal,target,target_f))
+correlacion <- cor(var_num)
+round(correlacion, 2)
+df_cor <- as.data.frame(as.table(correlacion))
+ggplot(df_cor, aes(x = Var1, y = Var2, fill = Freq))+
+  geom_tile(colour = "white")+
+  labs(title = "Correlación entre variables numéricas")
 ```
 
