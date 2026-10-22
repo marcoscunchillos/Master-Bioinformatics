@@ -29,7 +29,7 @@ This module provides an introduction to **Linear Algebra for Data Science**, cov
 
 | Assignment | Directory | Core Focus & Topics | Status |
 | :---: | :--- | :--- | :---: |
-| **Assignment 1** | [`assignment1_linear_systems/`](./assignment1_linear_systems/) | Linear systems, matrix algebra, and introductory problem solving with `CalcMe` and `R`. | 🟡 In Progress |
+| **Assignment 1** | [`assignment1_linear_systems/`](./assignment1_linear_systems.md/) | Linear systems, matrix algebra, and introductory problem solving with `CalcMe` and `R`. | 🟡 In Progress |
 | **Assignment 2** | [`assignment2_vector_spaces/`](./assignment2_vector_spaces/) | Vector spaces, basis transformations, and subspace operations for data science. | ⚪ Pending |
 | **Assignment 3** | [`assignment3_eigenvalues_eigenvectors/`](./assignment3_eigenvalues_eigenvectors/) | Eigenvalues, eigenvectors, spectral properties, and matrix factorization models. | ⚪ Pending |
 | **Assignment 4** | [`assignment4_svd_dimensionality/`](./assignment4_svd_dimensionality/) | Singular Value Decomposition (SVD) and dimensionality reduction techniques. | ⚪ Pending |

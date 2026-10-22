@@ -16,31 +16,28 @@ library(ggplot2)
 
 # Overview
 
-This report applies the theory of **linear systems** to two classic
-problems:
+This report applies the theory of **linear systems** to two classic problems:
 
 | Part | Problem | Linear-algebra idea |
-|-----------------|-----------------|---------------------------------------|
+|------|---------|---------------------|
 | 1 | Simple linear regression on two datasets | Overdetermined system solved by least squares (normal equations) |
 | 2 | Steady-state temperature of a metal plate | Square, sparse, symmetric system $A\mathbf{t} = \mathbf{b}$ with a unique solution |
 
 **Tools:** R, `ggplot2`, base `lm()` / `solve()` / `qr()`.
 
-------------------------------------------------------------------------
+---
 
 # Part 1. Least-squares regression
 
 ## Theory
 
-Given $n$ observations $(x_1, y_1), \dots, (x_n, y_n)$ of two
-characteristics of a set of individuals, we fit a linear model
-$y = ax + b$ that minimizes the squared distance between the model
-predictions and the observed values:
+Given $n$ observations $(x_1, y_1), \dots, (x_n, y_n)$ of two characteristics of a set of individuals,
+we fit a linear model $y = ax + b$ that minimizes the squared distance between the model predictions
+and the observed values:
 
 $$E(a, b) = \sum_{i=1}^{n} (a x_i + b - y_i)^2 .$$
 
-Setting the partial derivatives to zero gives a linear system in the
-unknowns $a$ and $b$:
+Setting the partial derivatives to zero gives a linear system in the unknowns $a$ and $b$:
 
 $$
 \frac{\partial E}{\partial a} = 2\sum_{i=1}^{n} (a x_i + b - y_i)\,x_i = 0,
@@ -48,9 +45,7 @@ $$
 \frac{\partial E}{\partial b} = 2\sum_{i=1}^{n} (a x_i + b - y_i) = 0 .
 $$
 
-Dividing both equations by $n$ and writing
-$\bar{x} = \frac{1}{n}\sum x_i$,
-$\overline{x^2} = \frac{1}{n}\sum x_i^2$,
+Dividing both equations by $n$ and writing $\bar{x} = \frac{1}{n}\sum x_i$, $\overline{x^2} = \frac{1}{n}\sum x_i^2$,
 $\overline{xy} = \frac{1}{n}\sum x_i y_i$, etc., the system becomes
 
 $$
@@ -59,17 +54,15 @@ a\,\overline{x^2} + b\,\bar{x} = \overline{xy},
 a\,\bar{x} + b = \bar{y}.
 $$
 
-From the second equation, $b = \bar{y} - a\bar{x}$. Substituting into
-the first one:
+From the second equation, $b = \bar{y} - a\bar{x}$. Substituting into the first one:
 
 $$
 a\left(\overline{x^2} - \bar{x}^2\right) = \overline{xy} - \bar{x}\bar{y}
 \quad\Longrightarrow\quad
-a = \frac{\overline{xy} - \bar{x}\bar{y}}{\overline{x^2} - \bar{x}^2} = \frac{\operatorname{cov}(x, y)}{\operatorname{var}(x)} .
+a = \frac{\overline{xy} - \bar{x}\bar{y}}{\overline{x^2} - \bar{x}^2} = \frac{\mathrm{cov}(x, y)}{\mathrm{var}(x)} .
 $$
 
-The regression line therefore always passes through the centroid
-$(\bar{x}, \bar{y})$.
+The regression line therefore always passes through the centroid $(\bar{x}, \bar{y})$.
 
 ## Closed-form helper
 
@@ -102,7 +95,7 @@ coef(model_a)
 # The closed-form solution must agree with lm()
 all.equal(unname(ols_line(x_a, y_a)), unname(coef(model_a)))
 
-
+# Goodness of fit
 summary(model_a)$r.squared
 ```
 
@@ -117,12 +110,10 @@ ggplot(data_a, aes(x = x, y = y)) +
   theme_minimal()
 ```
 
-**Does the line fit the data well?** Reasonably well:
-$R^2 \approx 0.84$, so about 84 % of the variability in $Y$ is explained
-by $X$, and the trend is clearly increasing. The two observations at
-$x = 10$ ($y = 20$ and $y = 7$) show that the scatter around the line is
-large, and the confidence band is wide, so predictions at individual
-points remain imprecise.
+**Does the line fit the data well?** Reasonably well: $R^2 \approx 0.84$, so about 84 % of the
+variability in $Y$ is explained by $X$, and the trend is clearly increasing. The two observations
+at $x = 10$ ($y = 20$ and $y = 7$) show that the scatter around the line is large, and the
+confidence band is wide, so predictions at individual points remain imprecise.
 
 ## Dataset B: fit, predictions and residuals
 
@@ -143,10 +134,9 @@ data_b$y_hat <- predict(model_b)
 
 The fitted line is $y \approx -0.623\,x + 7.796$.
 
-The plot overlays the observed data, the regression line and the model
-predictions $\hat{y}_i = a x_i + b$. By construction, all predictions
-lie on the line, and the dashed segments are the residuals
-$e_i = y_i - \hat{y}_i$ that least squares minimizes.
+The plot overlays the observed data, the regression line and the model predictions
+$\hat{y}_i = a x_i + b$. By construction, all predictions lie on the line, and the dashed
+segments are the residuals $e_i = y_i - \hat{y}_i$ that least squares minimizes.
 
 ```{r plot-b}
 ggplot(data_b, aes(x = x)) +
@@ -164,20 +154,19 @@ ggplot(data_b, aes(x = x)) +
   theme_minimal()
 ```
 
-**Interpretation.** The slope is negative, but the fit is weak
-($R^2 \approx 0.21$): $X$ explains only about a fifth of the variability
-in $Y$, and the points are widely scattered around the line. With only
-ten observations, this association should not be considered reliable
-without further data or a significance test.
+**Interpretation.** The slope is negative, but the fit is weak ($R^2 \approx 0.21$): $X$ explains
+only about a fifth of the variability in $Y$, and the points are widely scattered around the line.
+With only ten observations, this association should not be considered reliable without further
+data or a significance test.
 
-------------------------------------------------------------------------
+---
 
 # Part 2. Steady-state temperature of a metal plate
 
 ## Problem
 
-The temperature (in °C) is known along the perimeter of a square plate.
-The unknowns are the nine interior temperatures $T_{22}, \dots, T_{44}$:
+The temperature (in °C) is known along the perimeter of a square plate. The unknowns are the
+nine interior temperatures $T_{22}, \dots, T_{44}$:
 
 $$
 T =
@@ -190,8 +179,8 @@ T =
 \end{pmatrix}
 $$
 
-**Model assumption:** the temperature at each interior point equals the
-mean of its four neighbours (up, down, left, right). For example,
+**Model assumption:** the temperature at each interior point equals the mean of its four
+neighbours (up, down, left, right). For example,
 
 $$
 T_{22} = \frac{T_{12} + T_{21} + T_{23} + T_{32}}{4}
@@ -199,13 +188,11 @@ T_{22} = \frac{T_{12} + T_{21} + T_{23} + T_{32}}{4}
 4\,T_{22} - T_{23} - T_{32} = 95 + 53 = 148 .
 $$
 
-Repeating this for the nine interior points gives a $9 \times 9$ linear
-system $A\mathbf{t} = \mathbf{b}$ with
-$\mathbf{t} = (T_{22}, T_{23}, T_{24}, T_{32}, T_{33}, T_{34}, T_{42}, T_{43}, T_{44})^\top$.
-Each row of $A$ has a `4` on the diagonal and a `-1` for every interior
-neighbour, and the known boundary temperatures move to the right-hand
-side $\mathbf{b}$. This is the finite-difference discretization of the
-Laplace equation (steady-state heat diffusion).
+Repeating this for the nine interior points gives a $9 \times 9$ linear system $A\mathbf{t} = \mathbf{b}$
+with $\mathbf{t} = (T_{22}, T_{23}, T_{24}, T_{32}, T_{33}, T_{34}, T_{42}, T_{43}, T_{44})^\top$.
+Each row of $A$ has a `4` on the diagonal and a `-1` for every interior neighbour, and the known
+boundary temperatures move to the right-hand side $\mathbf{b}$. This is the finite-difference
+discretization of the Laplace equation (steady-state heat diffusion).
 
 ## Building the system
 
@@ -236,8 +223,7 @@ isSymmetric(A)
 ## Solving the system and discussing its type
 
 By the Rouché-Frobenius theorem, the system has a unique solution when
-\$\operatorname{rank}(A) = \operatorname{rank}([A \mid \mathbf{b}]) = \$
-number of unknowns.
+$\mathrm{rank}(A) = \mathrm{rank}([A \mid \mathbf{b}]) = $ number of unknowns.
 
 ```{r solve}
 # 1. Classify the system
@@ -253,29 +239,26 @@ round(t_interior, 2)
 all.equal(as.vector(A %*% t_interior), b)
 ```
 
-**Is the solution unique?** Yes.
-$\operatorname{rank}(A) = \operatorname{rank}([A \mid \mathbf{b}]) = 9$,
-which equals the number of unknowns, so the system is *compatible
-determinate* (equivalently, $\det(A) \neq 0$ and $A$ is invertible).
+**Is the solution unique?** Yes. $\mathrm{rank}(A) = \mathrm{rank}([A \mid \mathbf{b}]) = 9$,
+which equals the number of unknowns, so the system is *compatible determinate*
+(equivalently, $\det(A) \neq 0$ and $A$ is invertible).
 
-**Hottest and coldest interior points.** The maximum is at
-$T_{23} \approx 63.45\,^\circ\mathrm{C}$ (very close to
-$T_{22} \approx 63.43\,^\circ\mathrm{C}$), next to the hot upper edge.
-The minimum is at $T_{42} \approx 29.77\,^\circ\mathrm{C}$, next to the
-cold lower-left boundary.
+**Hottest and coldest interior points.** The maximum is at $T_{23} \approx 63.45\,^\circ\mathrm{C}$
+(very close to $T_{22} \approx 63.43\,^\circ\mathrm{C}$), next to the hot upper edge. The minimum is at
+$T_{42} \approx 29.77\,^\circ\mathrm{C}$, next to the cold lower-left boundary.
 
 ```{r which-extremes}
 names(which.max(t_interior)); max(t_interior)
 names(which.min(t_interior)); min(t_interior)
 ```
 
+
 ## Temperatures at the four corners
 
-Each corner has only three neighbours, so we take the mean of those
-three values:
+Each corner has only three neighbours, so we take the mean of those three values:
 
-| Corner   | Neighbours                             |
-|----------|----------------------------------------|
+| Corner | Neighbours |
+|--------|-----------|
 | $T_{11}$ | $T_{12} = 95$, $T_{21} = 53$, $T_{22}$ |
 | $T_{15}$ | $T_{14} = 63$, $T_{25} = 51$, $T_{24}$ |
 | $T_{51}$ | $T_{41} = 25$, $T_{52} = 18$, $T_{42}$ |
@@ -291,19 +274,22 @@ corners <- c(
 round(corners, 2)
 ```
 
-------------------------------------------------------------------------
+---
 
 # Conclusions
 
-- Least-squares regression reduces to a $2 \times 2$ linear system whose
-  solution is $a = \operatorname{cov}(x, y)/\operatorname{var}(x)$ and
-  $b = \bar{y} - a\bar{x}$; it matches `lm()` exactly.
-- $R^2$ quantifies fit quality: Dataset A shows a strong linear trend
-  ($R^2 \approx 0.84$), whereas Dataset B shows a weak association
-  ($R^2 \approx 0.21$).
-- The plate problem is a square, symmetric, sparse system with a unique
-  solution; checking `rank(A)` against `rank([A | b])` before calling
-  `solve()` is the practical form of the Rouché-Frobenius discussion.
-- For larger grids, direct elimination becomes expensive, which
-  motivates iterative methods (Jacobi, Gauss-Seidel) and sparse matrix
-  storage.
+- Least-squares regression reduces to a $2 \times 2$ linear system whose solution is
+  $a = \mathrm{cov}(x, y)/\mathrm{var}(x)$ and $b = \bar{y} - a\bar{x}$; it matches `lm()` exactly.
+- $R^2$ quantifies fit quality: Dataset A shows a strong linear trend ($R^2 \approx 0.84$),
+  whereas Dataset B shows a weak association ($R^2 \approx 0.21$).
+- The plate problem is a square, symmetric, sparse system with a unique solution; checking
+  `rank(A)` against `rank([A | b])` before calling `solve()` is the practical form of the
+  Rouché-Frobenius discussion.
+- For larger grids, direct elimination becomes expensive, which motivates iterative methods
+  (Jacobi, Gauss-Seidel) and sparse matrix storage.
+
+# Session information
+
+```{r session-info}
+sessionInfo()
+```

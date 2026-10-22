@@ -19,6 +19,7 @@ Marcos Cunchillos Just
   - [Temperatures at the four
     corners](#temperatures-at-the-four-corners)
 - [Conclusions](#conclusions)
+- [Session information](#session-information)
 
 # Overview
 
@@ -71,7 +72,7 @@ the first one:
 $$
 a\left(\overline{x^2} - \bar{x}^2\right) = \overline{xy} - \bar{x}\bar{y}
 \quad\Longrightarrow\quad
-a = \frac{\overline{xy} - \bar{x}\bar{y}}{\overline{x^2} - \bar{x}^2} = \frac{\operatorname{cov}(x, y)}{\operatorname{var}(x)} .
+a = \frac{\overline{xy} - \bar{x}\bar{y}}{\overline{x^2} - \bar{x}^2} = \frac{\mathrm{cov}(x, y)}{\mathrm{var}(x)} .
 $$
 
 The regression line therefore always passes through the centroid
@@ -117,6 +118,7 @@ all.equal(unname(ols_line(x_a, y_a)), unname(coef(model_a)))
     ## [1] TRUE
 
 ``` r
+# Goodness of fit
 summary(model_a)$r.squared
 ```
 
@@ -306,9 +308,9 @@ all.equal(as.vector(A %*% t_interior), b)
     ## [1] TRUE
 
 **Is the solution unique?** Yes.
-$\operatorname{rank}(A) = \operatorname{rank}([A \mid \mathbf{b}]) = 9$,
-which equals the number of unknowns, so the system is *compatible
-determinate* (equivalently, $\det(A) \neq 0$ and $A$ is invertible).
+$\mathrm{rank}(A) = \mathrm{rank}([A \mid \mathbf{b}]) = 9$, which
+equals the number of unknowns, so the system is *compatible determinate*
+(equivalently, $\det(A) \neq 0$ and $A$ is invertible).
 
 **Hottest and coldest interior points.** The maximum is at
 $T_{23} \approx 63.45\,^\circ\mathrm{C}$ (very close to
@@ -362,7 +364,7 @@ round(corners, 2)
 # Conclusions
 
 - Least-squares regression reduces to a $2 \times 2$ linear system whose
-  solution is $a = \operatorname{cov}(x, y)/\operatorname{var}(x)$ and
+  solution is $a = \mathrm{cov}(x, y)/\mathrm{var}(x)$ and
   $b = \bar{y} - a\bar{x}$; it matches `lm()` exactly.
 - $R^2$ quantifies fit quality: Dataset A shows a strong linear trend
   ($R^2 \approx 0.84$), whereas Dataset B shows a weak association
@@ -373,3 +375,42 @@ round(corners, 2)
 - For larger grids, direct elimination becomes expensive, which
   motivates iterative methods (Jacobi, Gauss-Seidel) and sparse matrix
   storage.
+
+# Session information
+
+``` r
+sessionInfo()
+```
+
+    ## R version 4.6.0 (2026-04-24 ucrt)
+    ## Platform: x86_64-w64-mingw32/x64
+    ## Running under: Windows 11 x64 (build 26200)
+    ## 
+    ## Matrix products: default
+    ##   LAPACK version 3.12.1
+    ## 
+    ## locale:
+    ## [1] LC_COLLATE=Spanish_Spain.utf8  LC_CTYPE=Spanish_Spain.utf8   
+    ## [3] LC_MONETARY=Spanish_Spain.utf8 LC_NUMERIC=C                  
+    ## [5] LC_TIME=Spanish_Spain.utf8    
+    ## 
+    ## time zone: Europe/Madrid
+    ## tzcode source: internal
+    ## 
+    ## attached base packages:
+    ## [1] stats     graphics  grDevices utils     datasets  methods   base     
+    ## 
+    ## other attached packages:
+    ## [1] ggplot2_4.0.3
+    ## 
+    ## loaded via a namespace (and not attached):
+    ##  [1] vctrs_0.7.3        nlme_3.1-169       cli_3.6.6          knitr_1.51        
+    ##  [5] rlang_1.2.0        xfun_0.57          generics_0.1.4     S7_0.2.2          
+    ##  [9] labeling_0.4.3     glue_1.8.1         htmltools_0.5.9    scales_1.4.0      
+    ## [13] rmarkdown_2.31     grid_4.6.0         evaluate_1.0.5     tibble_3.3.1      
+    ## [17] fastmap_1.2.0      yaml_2.3.12        lifecycle_1.0.5    compiler_4.6.0    
+    ## [21] dplyr_1.2.1        RColorBrewer_1.1-3 pkgconfig_2.0.3    mgcv_1.9-4        
+    ## [25] rstudioapi_0.18.0  lattice_0.22-9     farver_2.1.2       digest_0.6.39     
+    ## [29] R6_2.6.1           tidyselect_1.2.1   splines_4.6.0      pillar_1.11.1     
+    ## [33] magrittr_2.0.5     Matrix_1.7-5       withr_3.0.2        tools_4.6.0       
+    ## [37] gtable_0.3.6
