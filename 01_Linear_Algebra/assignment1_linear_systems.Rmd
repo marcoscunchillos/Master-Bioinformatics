@@ -310,8 +310,7 @@ $$
 1&0&1&0\\
 0&1&0&1
 \end{pmatrix}}_{A}
-\underbrace{\begin{pmatrix}x_1\\x_2\\x_3\\x_4\end{pmatrix}}_{\mathbf{x}}
-=
+\underbrace{\begin{pmatrix}x_1\\x_2\\x_3\\x_4\end{pmatrix}}_{\mathbf{x}} =
 \underbrace{\begin{pmatrix}5\\3\\4\\4\end{pmatrix}}_{\mathbf{b}}
 $$
 
