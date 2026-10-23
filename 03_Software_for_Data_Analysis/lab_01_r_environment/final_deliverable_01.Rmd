@@ -1,238 +1,339 @@
 ---
-title: "PEC1"
+title: "Exploratory Analysis of Heart Disease and Oesophageal Cancer Data"
+subtitle: "Software for Data Analysis, Lab 01: Final deliverable (PEC1)"
 author: "Marcos Cunchillos Just"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 7, fig.height = 4.5)
 ```
 
-#Sección 1. Importación, exportación y gestión de datos
-El objetivo de esta sección es conocer la sintaxis en R para importar y exportar diferentes
-tipos de archivos de datos y cómo visualizarlos desde RStudio, así como acceder a
-conjuntos de datos de diferentes fuentes y entornos. Esta primera parte corresponde al paso
-inicial de un estudio de análisis de datos.
+# Overview
 
-##Ejercicio 1
-A partir del archivo heart.csv sobre enfermedades cardíacas:
+This report applies the core R workflow of the module (importing and exporting data, data wrangling, descriptive statistics and graphics) to two clinical datasets:
 
-###1.1. Importe los datos del archivo en un data frame llamado HeartStat y muestre los 6 primeros registros (head) y los 6 últimos (tail).
-```{r}
+| Dataset | Source | Design | Question |
+| :--- | :--- | :--- | :--- |
+| `heart.csv` (Statlog Heart Disease) | UCI Machine Learning Repository | 270 patients, 14 clinical variables | Which clinical features differ between patients with and without heart disease? |
+| `esoph` | `datasets` (R) | Aggregated case-control study, Ille-et-Vilaine (France) | How are alcohol and tobacco intake related to oesophageal cancer? |
+
+**Reproducibility:** place `heart.csv` in a `data/` folder next to this file and knit. The `esoph` export is written to `output/`. Both folders are excluded from version control.
+
+```{r packages}
 library(readr)
-HeartStat <- read_csv("data/heart.csv")
-#6 primeros registros
-head(HeartStat)
-#6 últimos registros
-tail(HeartStat)
+library(dplyr)
+library(ggplot2)
+
+# Consistent, colour-blind-friendly palette for disease status
+status_colours <- c(Healthy = "#009E73", Disease = "#D55E00")
 ```
 
-####1.2. Describa las características del conjunto de datos: nombre de las variables, tipos de datos, tamaño de la muestra (número de filas y columnas) y prospección de valores nulos. Proponga qué tipo de análisis exploratorio y gráficos serán adecuados según la naturaleza de las variables.
-```{r}
-#Nombre de las variables y tipo de datos
-str(HeartStat)
-#Tamaño de la muestra
-dim(HeartStat)
-#Prospección de valores nulos
-any(is.na(HeartStat))
-sapply(HeartStat, is.null)
+# Part 1. Data import, export and management
+
+## 1.1 Importing the heart disease data
+
+```{r import-heart}
+heart_data <- read_csv("data/heart.csv")
+
+head(heart_data)
+tail(heart_data)
 ```
-Todos los datos son númericos, por lo que el análisis debería de ser cuantitativo.
 
-###1.3. Supongamos que en este dataset detectamos valores ausentes en una variable. La práctica habitual de "eliminar todas las filas con un valor ausente" (complete-case analysis) puede introducir un sesgo. Explique qué riesgo puede comportar descartar sistemáticamente a pacientes que no tienen el expediente médico completo. 10-15 líneas.
-El principal riesgo del análisis de casos completos es introducir un importante sesgo de selección, ya que se estaría asumiendo (normalmente) erróneamente que los datos faltan de forma aleatoria. Al descartar pacientes con expedientes incompletos, se excluye sistemáticamente a los individuos más graves que no logran tolerar o terminar las pruebas, lo que subestima la severidad real de la patología. Asimismo, se ocultan los fracasos terapéuticos al eliminar a quienes abandonan el seguimiento por sufrir efectos secundarios severos, sobrestimando artificialmente la seguridad y eficacia del tratamiento. Esta práctica también invisibiliza a las poblaciones socioeconómicamente vulnerables, cuyos historiales suelen estar fragmentados por un peor acceso continuo al sistema de salud. Además de este sesgo, a nivel matemático, la reducción de la muestra reduce también la potencia estadística y eleva el riesgo de no detectar efectos reales. En consecuencia, el estudio pierde su validez externa y deja de representar a la población general, haciendo necesario el uso de métodos más seguros como la imputación múltiple.
+## 1.2 Dataset description
 
-##Ejercicio 2
-En este ejercicio se trabajará con el conjunto de datos esoph del paquete nativo datasets de
-R, que contiene datos de un estudio de casos y controles sobre cáncer de esófago en
-Francia.
-###2.1.Explique qué información contiene el conjunto de datos esoph y sus características más relevantes. Sugiera y justifique alguna acción de preparación o transformación de los datos (p. ej., creación de nuevas variables categóricas o agrupación de niveles de consumo de tabaco/alcohol).
-```{r}
+```{r describe-heart}
+str(heart_data)
+dim(heart_data)
+
+# Missing-value screening: overall and per variable
+any(is.na(heart_data))
+colSums(is.na(heart_data))
+```
+
+The dataset contains **270 patients** (rows) and **14 variables** (columns), with **no missing values**. All variables are stored as numeric, but several are categorical variables encoded as integers, which matters for choosing the right summary and plot:
+
+| Variable | Meaning | True nature | Suitable exploration |
+| :--- | :--- | :--- | :--- |
+| `age` | Age (years) | Quantitative | Histogram, boxplot |
+| `sex` | Sex (1 = male, 0 = female) | Categorical | Bar plot, contingency table |
+| `cp` | Chest pain type (0-3) | Categorical | Bar plot, contingency table |
+| `trestbps` | Resting blood pressure (mm Hg) | Quantitative | Histogram, boxplot |
+| `chol` | Serum cholesterol (mg/dl) | Quantitative | Histogram, Q-Q plot |
+| `fbs` | Fasting blood sugar > 120 mg/dl (1 = yes) | Categorical | Contingency table |
+| `restecg` | Resting ECG result (0-2) | Categorical | Contingency table, heatmap |
+| `thalach` | Maximum heart rate achieved | Quantitative | Boxplot by group |
+| `exang` | Exercise-induced angina (1 = yes) | Categorical | Contingency table |
+| `oldpeak` | ST depression induced by exercise | Quantitative | Histogram, correlation |
+| `slope` | Slope of the peak-exercise ST segment (0-2) | Categorical | Contingency table |
+| `ca` | Major vessels coloured by fluoroscopy (0-3) | Categorical | Bar plot |
+| `thal` | Thallium stress test result (1-3) | Categorical | Bar plot |
+| `target` | Heart disease (1 = present, 0 = absent) | Categorical | Grouping variable |
+
+## 1.3 Complete-case analysis and selection bias
+
+Dropping every patient with a missing value (complete-case analysis) implicitly assumes that data are missing completely at random, which is rarely true in clinical records. Patients who are most severely ill often cannot tolerate or finish all examinations, so excluding them underestimates disease severity. Patients who drop out of follow-up because of side effects also disappear, which inflates the apparent safety and efficacy of a treatment. Fragmented records are also more common in socioeconomically vulnerable groups with poorer access to healthcare, so these populations become under-represented. On top of this selection bias, discarding rows reduces the sample size, which lowers statistical power and increases the risk of missing real effects. The resulting estimates lose external validity, and safer strategies (examining the missingness mechanism, multiple imputation, or model-based approaches) are preferable.
+
+## 2.1 The `esoph` dataset
+
+```{r explore-esoph}
 data("esoph")
 head(esoph)
 str(esoph)
 ```
-El conjunto de datos `esoph` procede de un estudio de casos y controles sobre cáncer de esófago realizado en Ille-et-Vilaine (Francia). Los datos están **agregados**: cada fila no es una persona, sino una combinación de grupo de edad, consumo de alcohol y consumo de tabaco, con el número de casos y de controles de ese grupo. Contiene 88 filas y 5 variables:
 
-- `agegp`: grupo de edad (factor ordenado, 6 niveles).
-- `alcgp`: consumo diario de alcohol en gramos (factor ordenado, 4 niveles).
-- `tobgp`: consumo diario de tabaco en gramos (factor ordenado, 4 niveles).
-- `ncases`: número de casos (pacientes con cáncer de esófago).
-- `ncontrols`: número de controles (personas sanas).
+`esoph` comes from a case-control study of oesophageal cancer in the Ille-et-Vilaine region of France. The data are **aggregated**: each row is not a person but a combination of age group, alcohol intake and tobacco intake, with the number of cases and controls in that stratum. It has 88 rows and 5 variables:
 
-Sus características más relevantes son que las tres variables explicativas son factores ordenados, lo que permite estudiar la relación dosis-respuesta entre consumo y riesgo, y que, al ser datos agregados, cada fila contiene un número distinto de personas, por lo que las filas no tienen el mismo peso.
+* `agegp`: age group (ordered factor, 6 levels).
+* `alcgp`: daily alcohol intake in grams (ordered factor, 4 levels).
+* `tobgp`: daily tobacco intake in grams (ordered factor, 4 levels).
+* `ncases`: number of cases (oesophageal cancer).
+* `ncontrols`: number of controls (healthy individuals).
 
-**Preparación propuesta.** Se crean dos tipos de variables nuevas:
+The three explanatory variables are ordered factors, which allows a dose-response analysis between consumption and risk. Because rows are aggregated, each row represents a different number of people and therefore carries a different weight.
 
-1. `n_total` y `case_prop`: el total de personas por fila y la proporción de casos. Permiten comparar combinaciones de riesgo con una sola variable en lugar de dos conteos.
-2. `alc_group` y `tob_group`: agrupación de los niveles de consumo en dos categorías (bajo y alto). Se toma como consumo alto el alcohol a partir de 80 g/día y el tabaco a partir de 20 g/día, umbrales habituales para definir un consumo elevado. La agrupación reduce el número de categorías, lo que facilita tablas y modelos cuando hay pocos casos por combinación, a costa de perder parte del detalle.
+Two derived variables address this:
 
-###2.2. Exporte el data frame esoph modificado a un archivo en formato .csv (llamado esoph_modificat.csv) especificando la ruta de destino y asegurándose de no incluir el índice de filas.
-```{r}
-# Work on a copy so the original dataset is untouched
-esoph_modified <- esoph
+1. `n_total` and `prop_cases`: the stratum size and the proportion of cases, which summarise the two counts in one comparable variable.
+2. `alcohol_group` and `tobacco_group`: a binary grouping of intake (alcohol >= 80 g/day and tobacco >= 20 g/day are labelled *High*, i.e. the 3rd and 4th factor levels). Fewer categories make tables and models more stable when strata contain few cases.
 
-# Total number of people and proportion of cases in each row
-esoph_modified$n_total   <- esoph_modified$ncases + esoph_modified$ncontrols
-esoph_modified$case_prop <- esoph_modified$ncases / esoph_modified$n_total
+```{r recode-esoph}
+#' Collapse an ordered intake factor into a Low/High binary factor
+#'
+#' @param x An ordered factor with levels sorted by increasing intake.
+#' @param cutoff Integer position of the first level considered "High".
+#' @return A factor with levels "Low" and "High".
+collapse_intake <- function(x, cutoff = 3) {
+  factor(ifelse(as.integer(x) >= cutoff, "High", "Low"),
+         levels = c("Low", "High"))
+}
 
-# Collapse the ordered factors into two levels:
-esoph_modified$alc_group <- factor(ifelse(as.integer(esoph_modified$alcgp) >= 3,
-                                          "High", "Low"),
-                                   levels = c("Low", "High"))
-
-esoph_modified$tob_group <- factor(ifelse(as.integer(esoph_modified$tobgp) >= 3,
-                                          "High", "Low"),
-                                   levels = c("Low", "High"))
+esoph_modified <- esoph %>%
+  mutate(
+    n_total       = ncases + ncontrols,
+    prop_cases    = ncases / n_total,
+    alcohol_group = collapse_intake(alcgp),
+    tobacco_group = collapse_intake(tobgp)
+  )
 
 str(esoph_modified)
+```
 
-# Create the destination folder if it does not exist
+## 2.2 Exporting the modified data
+
+```{r export-esoph}
 dir.create("output", showWarnings = FALSE)
 
-# row.names = FALSE avoids writing the row index as an extra column
-write.csv(esoph_modified,
-          file = file.path("output", "esoph_modificat.csv"),
-          row.names = FALSE)
+# row.names = FALSE avoids saving the row index as an extra column
+write.csv(esoph_modified, file = "output/esoph_modified.csv", row.names = FALSE)
 ```
 
+The file is saved as `output/esoph_modified.csv`. Setting `row.names = FALSE` prevents the row index from reappearing as an additional column when the file is re-imported.
 
-###2.3. El dataset esoph recoge información sobre hábitos de consumo de alcohol y tabaco relacionados con una enfermedad grave. Cuando los algoritmos de salud utilizan datos de estilo de vida para evaluar riesgos o priorizar tratamientos, ¿cuál es el límite ético entre la prevención médica y la discriminación o estigmatización de determinados colectivos? 10-15 líneas.
-El límite entre prevención y discriminación, en mi opinión está en para qué se usa el dato y qué consecuencias tiene para la persona. Un algoritmo que detecta a quien bebe o fuma mucho para ofrecerle cribados, información o programas de apoyo hace prevención, por lo que el resultado le beneficia y es voluntario. Es discriminación cuando ese mismo perfil sirve para negarle un tratamiento, retrasarlo, encarecerle un seguro o culpabilizarle de su enfermedad. 
+## 2.3 Ethics: prevention versus discrimination
 
-Además, los hábitos de vida no son solo una elección libre. El alcohol y el tabaco se relacionan con la clase social, el estrés, el entorno laboral y el acceso a la sanidad, así que un algoritmo que penalice esas variables puede acabar penalizando la pobreza y reforzando desigualdades previas. Por eso creo que deben cumplirse varias condiciones. Principalmente, usar los datos para ayudar y no para excluir, ser transparente sobre qué variables pesan en la decisión, mantener siempre una persona que revise y pueda corregir al algoritmo, y proteger estos datos como información sanitaria sensible, como exige la ley. Además la prevención debe respetar la autonomía del paciente, la discriminación la sustituye por un juicio automático sobre su estilo de vida.
+The boundary between prevention and discrimination lies in what the data are used for and what happens to the person afterwards. An algorithm that identifies heavy drinkers or smokers in order to offer screening, information or support programmes is preventive: the outcome benefits the individual and participation is voluntary. It becomes discriminatory when the same profile is used to deny or delay treatment, raise insurance costs or blame patients for their disease.
 
-#Sección 2: Análisis básico del conjunto de datos
-El objetivo de esta sección es obtener información sobre un conjunto de datos determinado, realizando diversas operaciones y consultas.
+Lifestyle is also not purely a free choice. Alcohol and tobacco use are linked to social class, stress, working conditions and access to healthcare, so an algorithm that penalises these variables may end up penalising poverty and reinforcing existing inequalities. Several conditions should therefore hold: use the data to help rather than exclude, be transparent about which variables drive a decision, keep a human reviewer able to override the algorithm, and protect these data as sensitive health information.
 
-##Ejercicio 3
-Considerando el data frame HeartStat, resuelva las siguientes cuestiones (incluya código y resultados):
-###3.1.Calcule la proporción de pacientes según el tipo de dolor torácico (cp), agrupados por la presencia o ausencia de enfermedad cardíaca (target). Comente los resultados.
-```{r}
-# Recuento de los tipos de dolor torácico (filas) en función de la presencia o ausencia de enfermedad cardiaca (columnas)
-tab_cp <- table(HeartStat$cp, HeartStat$target)
-tab_cp
+# Part 2. Basic data analysis
 
-# Proporciones agrupadas según ausencia o presencia de enfermedad cardiaca
-prop_cp <- prop.table(tab_cp, margin = 2)
-round(prop_cp, 3)
+## 3.1 Chest pain type by disease status
+
+```{r chest-pain}
+# Counts of chest pain type (rows) by disease status (columns)
+chest_pain_counts <- table(chest_pain = heart_data$cp, target = heart_data$target)
+chest_pain_counts
+
+# Proportions within each disease group (columns sum to 1)
+round(prop.table(chest_pain_counts, margin = 2), 3)
 ```
 
-###3.2.Muestre la relación entre el sexo de los pacientes (sex: 1 = hombre, 0 = mujer) y la presencia de enfermedad cardíaca (target). Represente un gráfico de barras que compare estas proporciones.
-```{r}
-library(ggplot2)
+In this file chest pain is coded 0-3. Among patients **with** heart disease, 75.8% have type 3 (asymptomatic), whereas types 0, 1 and 2 add up to only 24.2%. Among patients **without** disease, type 2 (non-anginal pain) predominates (41.3%), type 3 appears in 25.3% and types 0-2 account for 74.7%. Although counter-intuitive, the absence of symptoms is the category most associated with disease in this sample.
 
-# Renombrar las variables númericas en factores etiquetados
-HeartStat$sex_f    <- factor(HeartStat$sex,    levels = c(0, 1),
-                             labels = c("Mujer", "Hombre"))
-HeartStat$target_f <- factor(HeartStat$target, levels = c(0, 1),
-                             labels = c("Sano", "Enfermo"))
+## 3.2 Sex and heart disease
 
-# Contarlos pacientes por sexo y presencia/ausencia de enfermedad
-tab_sex <- table(Sexo = HeartStat$sex_f, Salud = HeartStat$target_f)
+```{r sex-disease}
+heart_data <- heart_data %>%
+  mutate(
+    sex_label    = factor(sex, levels = c(0, 1), labels = c("Female", "Male")),
+    status_label = factor(target, levels = c(0, 1), labels = c("Healthy", "Disease"))
+  )
 
-# Proporción de pacientes con y sin enfermedad por sexo 
-prop_sex <- prop.table(tab_sex, margin = 1)
-round(prop_sex, 3)
+# Patients by sex and disease status, and proportions within each sex
+sex_counts <- table(Sex = heart_data$sex_label, Status = heart_data$status_label)
+sex_counts
+round(prop.table(sex_counts, margin = 1), 3)
 
-# Convertir la tabla en un data frame para hacer una gráfica con ggplot
-df_sex <- as.data.frame(prop_sex, responseName = "Proporción")
+# Long format for ggplot2 (geom_col plots values that are already computed)
+sex_props <- as.data.frame(prop.table(sex_counts, margin = 1),
+                           responseName = "proportion")
 
-# Crear la gráfica
-ggplot(df_sex, aes(x = Sexo, y = Proporción, fill = Salud)) +
+ggplot(sex_props, aes(x = Sex, y = proportion, fill = Status)) +
   geom_col(colour = "black") +
+  scale_fill_manual(values = status_colours) +
   ylim(0, 1) +
-  labs(x = "Sexo", y = "Proporción de pacientes",
-       fill = "Salud cardiaca", title = "Enfermedades cardiacas por sexo")
+  labs(title = "Heart disease by sex",
+       x = "Sex", y = "Proportion of patients", fill = "Cardiac status")
 ```
 
-###3.3.Evalúe la presencia de enfermedad cardíaca según los niveles de azúcar en sangre en ayunas (fbs), contando el número absoluto de pacientes por cada categoría.
-```{r}
-tab_fbs <- table(fbs = HeartStat$fbs, target = HeartStat$target)
-tab_fbs
+Heart disease is present in 23.0% of women (20 of 87) and in 54.6% of men (100 of 183), so it is more than twice as frequent in men in this sample. The sample is predominantly male (183 men versus 87 women), so the estimate for women is less precise.
+
+## 3.3 Fasting blood sugar and heart disease
+
+```{r fasting-sugar}
+fbs_counts <- table(fbs = heart_data$fbs, target = heart_data$target)
+fbs_counts
+
+# Proportion of patients in each disease group, within each glycaemia level
+round(prop.table(fbs_counts, margin = 1), 3)
 ```
 
-###3.4.Muestre en una tabla el número de pacientes con diagnóstico positivo de enfermedad cardíaca, agrupados por tipo de angina de esfuerzo (exang), que sean hombres y cuya presión arterial en reposo sea superior a la media de la muestra.
-```{r}
-mean_bps<-mean(HeartStat$trestbps)
+`fbs` is 1 when fasting blood sugar exceeds 120 mg/dl and 0 otherwise. Of the 230 patients with normal glycaemia, 103 have heart disease (44.8%); of the 40 patients with elevated glycaemia, 17 do (42.5%). The two proportions are almost identical, so elevated fasting sugar does not appear to be associated with disease in this sample. The absolute counts are higher in the normal group simply because that group is much larger.
 
-angina<-subset(HeartStat,
-               sex == 1 & trestbps > mean_bps & target == 1)
+## 3.4 Men with disease and above-average resting blood pressure
 
-tabla_angina<-table(angina$exang)
-tabla_angina
+```{r hypertensive-men}
+mean_bps <- mean(heart_data$trestbps)
+mean_bps
+
+exertional_angina <- heart_data %>%
+  filter(sex == 1, trestbps > mean_bps, target == 1)
+
+table(exertional_angina = exertional_angina$exang)
 ```
 
-###3.5.En muchos modelos aplicados a la cardiología, la variable "sexo" o "etnia" mejora la capacidad predictiva del modelo, pero puede generar sesgos de atención si el modelo se ha entrenado mayoritariamente con un solo perfil de paciente (por ejemplo, hombres de mediana edad). ¿Qué precauciones deberían tomarse antes de implementar un algoritmo de ayuda al diagnóstico cardíaco en un hospital real?
-Deberíamos de asegurarnos de que el conjunto de datos que se ha utilizado para entrenar a ese algoritmo, contiene información médica de toda la variedad de personas que lo van a utilizar (diferentes sexos y etnias) en cantidades similares.
+There are 42 men with heart disease and a resting blood pressure above the sample mean (131.3 mm Hg). Of these, 18 have no exercise-induced angina (`exang = 0`) and 24 do (`exang = 1`), which is 57.1%.
 
-#Sección 3: Estadística descriptiva y gráficos (4 puntos)
-El objetivo de este apartado es trabajar los conceptos de estadística descriptiva y de representación de gráficos.
+## 3.5 Precautions before deploying a diagnostic algorithm
 
-##Ejercicio 4
-Considerando el data frame HeartStat, resuelva las siguientes cuestiones (incluya código y resultados):
-###4.1.Obtenga las principales estadísticas descriptivas (media, desviación estándar, mediana, cuartiles y rango intercuartílico) de las variables cuantitativas continuas del dataset (age, trestbps, chol, thalach). Comente los resultados destacando si observa asimetría o valores atípicos.
-```{r}
-summary(HeartStat)
+Before implementing a diagnostic support algorithm in a real hospital, one must first verify that the training data represent the whole population that will use it, with enough patients of each sex, age and ethnicity. In our own sample, 68% of patients are men (183 of 270), and a model trained on these data could perform worse in women. Overall performance is not enough: the algorithm must be evaluated separately in every subgroup, because a good average accuracy can hide systematic errors in a minority group. It must also be validated on the hospital's own data, since the local population can differ from the training one. The algorithm should remain a support tool rather than replace the clinician, who keeps the final decision and must be able to understand what a prediction is based on. Finally, its behaviour should be audited periodically after deployment to detect bias or performance drift, and patient data must be protected.
+
+# Part 3. Descriptive statistics and graphics
+
+## 4.1 Descriptive statistics of continuous variables
+
+```{r descriptive-stats}
+continuous_vars <- c("age", "trestbps", "chol", "thalach")
+
+heart_data %>%
+  select(all_of(continuous_vars)) %>%
+  summarise(across(everything(), list(
+    mean = mean, sd = sd, median = median,
+    q1 = ~ quantile(.x, 0.25), q3 = ~ quantile(.x, 0.75), iqr = IQR
+  ))) %>%
+  tidyr::pivot_longer(everything(),
+                      names_to = c("variable", ".value"),
+                      names_pattern = "(.*)_(mean|sd|median|q1|q3|iqr)") %>%
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
 ```
 
+```{r boxplots-continuous, fig.height = 5.5}
+heart_data %>%
+  select(all_of(continuous_vars)) %>%
+  tidyr::pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = "", y = value)) +
+  geom_boxplot(fill = "lightblue") +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(title = "Distribution of continuous variables", x = NULL, y = NULL)
+```
 
-###4.2.Realice un diagrama de cajas que relacione la frecuencia cardíaca máxima alcanzada con la presencia o ausencia de enfermedad cardíaca. ¿Qué conclusión puede extraer?
-```{r}
-HeartStat$target_f <- factor(HeartStat$target, levels = c(0, 1),
-                             labels = c("Sano", "Enfermo"))
+* **Age:** mean 54.4 years, median 55, SD 9.1. Mean and median are nearly equal and the box is symmetric, so the distribution is symmetric with no outliers.
+* **Resting blood pressure:** mean 131.3 mm Hg, median 130, IQR 20. Slightly right-skewed, with several high outliers (above about 170 mm Hg) that correspond to marked hypertension.
+* **Cholesterol:** mean 249.7 mg/dl, median 245, the largest relative dispersion (SD 51.7, IQR 67). It is the most right-skewed variable, with very high outliers up to 564 mg/dl.
+* **Maximum heart rate:** mean 149.7 bpm, median 153.5, SD 23.2. Slightly left-skewed (mean below median) with one low outlier at 71 bpm.
 
-ggplot(HeartStat, aes(x = target_f, y = thalach, fill = target_f)) +
-  geom_boxplot() +
-  labs(x = "Enfermedad cardiaca", y = "Frecuencia cardiaca máxima")
+## 4.2 Maximum heart rate by disease status
 
-tapply(HeartStat$thalach, HeartStat$target_f, median)
-    ```
-El diagrama de cajas muestra que los pacientes con enfermedad cardíaca alcanzan una frecuencia cardíaca máxima menor (mediana de 141.5 lpm) que los pacientes sin enfermedad (mediana de 161.0 lpm). Las cajas se solapan poco, por lo que la diferencia es clara. Esto sugiere que una menor capacidad de elevar la frecuencia cardíaca durante el esfuerzo se asocia con la presencia de enfermedad cardíaca. 
+```{r thalach-boxplot}
+ggplot(heart_data, aes(x = status_label, y = thalach, fill = status_label)) +
+  geom_boxplot(show.legend = FALSE) +
+  scale_fill_manual(values = status_colours) +
+  labs(title = "Maximum heart rate by cardiac status",
+       x = "Heart disease", y = "Maximum heart rate (bpm)")
 
-###4.3.Construya una tabla de frecuencias cruzadas que relacione el resultado del electrocardiograma en reposo con la presencia de enfermedad cardíaca. A continuación, represente esta información mediante un mapa de calor (heatmap) para identificar visualmente qué patrones son los más frecuentes.
-```{r}
-frec_cruz <- table(ECG = HeartStat$restecg, Enfermedad = HeartStat$target)
-df_cruz <- as.data.frame(frec_cruz) 
-ggplot(df_cruz, aes(x = Enfermedad, y = ECG, fill = Freq))+
-  labs(x = "Enfermedad", y = "Electrocardiograma en reposo")+
+heart_data %>%
+  group_by(status_label) %>%
+  summarise(median_thalach = median(thalach))
+```
+
+Patients with heart disease reach a lower maximum heart rate (median 141.5 bpm) than patients without disease (median 161.0 bpm), about 20 bpm less. The boxes overlap only partially and each group's median falls outside the other's box, so the difference is clear. This suggests that a reduced ability to raise the heart rate during exercise is associated with heart disease. It is an observed association in this sample and does not imply causation.
+
+## 4.3 Resting ECG and heart disease
+
+```{r ecg-heatmap}
+ecg_counts <- table(ECG = heart_data$restecg, Disease = heart_data$target)
+ecg_counts
+
+ecg_df <- as.data.frame(ecg_counts)
+
+ggplot(ecg_df, aes(x = Disease, y = ECG, fill = Freq)) +
   geom_tile(colour = "white") +
   geom_text(aes(label = Freq)) +
-  scale_fill_gradient(low = "lightyellow", high = "tomato")
-  
+  scale_fill_gradient(low = "lightyellow", high = "tomato") +
+  labs(title = "Resting ECG result by disease status",
+       x = "Heart disease (0 = absent, 1 = present)",
+       y = "Resting ECG result", fill = "Patients")
 ```
 
+The most frequent pattern is a normal resting ECG (0) in patients without disease (85 patients). Among patients with disease, the most common result is probable left ventricular hypertrophy (2), with 73 patients. In proportion, disease is more frequent in patients with ECG type 2 (73 of 137, 53%) than in those with a normal ECG (46 of 131, 35%), suggesting an association between resting ECG abnormalities and disease. Type 1 has only 2 patients and cannot be interpreted.
 
-###4.4.Represente un histograma de la variable nivel de colesterol (chol) para los pacientes con enfermedad cardíaca. Superponga la curva de densidad empírica y la curva de densidad normal teórica. Evalúe si la variable sigue una distribución normal y comente el resultado.
-```{r}
-enfermos <- subset(HeartStat,target==1)
-chol_enf <- enfermos$chol
+## 4.4 Cholesterol distribution in patients with disease
 
-hist(chol_enf,             
-     freq   = FALSE,
-     breaks = 20,
-     col    = "lightblue",
-     border = "black",
-     xlab   = "Colesterol (mg/dl)",
-     ylab   = "Densidad",
-     main   = "Colesterol en pacientes con enfermedad cardiaca")
+```{r cholesterol-normality}
+disease_chol <- heart_data %>%
+  filter(target == 1) %>%
+  pull(chol)
 
-shapiro.test(chol_enf)
-qqnorm(chol_enf)
-qqline(chol_enf)
+# Histogram on a density scale with empirical and theoretical normal curves
+hist(disease_chol,
+     freq = FALSE, breaks = 20, col = "lightblue", border = "black",
+     xlab = "Cholesterol (mg/dl)", ylab = "Density",
+     main = "Cholesterol in patients with heart disease")
+lines(density(disease_chol), col = "red", lwd = 2)
+curve(dnorm(x, mean = mean(disease_chol), sd = sd(disease_chol)),
+      add = TRUE, col = "darkgreen", lwd = 2)
+legend("topright", legend = c("Empirical density", "Normal density"),
+       col = c("red", "darkgreen"), lwd = 2)
 
-```
-El histograma con las curvas de densidad empírica y normal teórica muestra un ajuste razonable, y el gráfico Q-Q presenta los puntos alineados con la recta teórica, con pequeñas desviaciones en las colas. El test de Shapiro-Wilk (W = 0.986, p = 0.256) no permite rechazar la hipótesis de normalidad. Por tanto, el nivel de colesterol en los pacientes con enfermedad cardíaca puede considerarse aproximadamente normal.
-
-###4.5.Calcule la matriz de correlación lineal entre las variables cuantitativas del dataset y represéntela mediante un gráfico de correlación. Comente qué dos variables muestran la correlación más fuerte (positiva o negativa) e interprete su significado clínico.
-```{r}
-var_num <- subset(HeartStat,select = -c(sex,cp,fbs,restecg,exang,slope,ca,thal,target,target_f))
-correlacion <- cor(var_num)
-round(correlacion, 2)
-df_cor <- as.data.frame(as.table(correlacion))
-ggplot(df_cor, aes(x = Var1, y = Var2, fill = Freq))+
-  geom_tile(colour = "white")+
-  labs(title = "Correlación entre variables numéricas")
+# Q-Q plot and Shapiro-Wilk test (H0: the data are normally distributed)
+qqnorm(disease_chol)
+qqline(disease_chol)
+shapiro.test(disease_chol)
 ```
 
+The histogram with the empirical (red) and theoretical normal (green) density curves shows a reasonable fit, with a slight right skew caused by a few high cholesterol values. In the Q-Q plot the points follow the reference line, with small deviations in the tails (two values above 400 mg/dl). The Shapiro-Wilk test (W = 0.986, p = 0.256) does not reject normality, because the p-value is above 0.05. Cholesterol in patients with heart disease can therefore be considered approximately normal.
+
+## 4.5 Correlation matrix
+
+```{r correlation}
+numeric_vars <- heart_data %>%
+  select(age, trestbps, chol, thalach, oldpeak)
+
+correlation_matrix <- cor(numeric_vars)
+round(correlation_matrix, 2)
+
+correlation_df <- as.data.frame(as.table(correlation_matrix))
+
+ggplot(correlation_df, aes(x = Var1, y = Var2, fill = Freq)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = round(Freq, 2)), size = 3) +
+  scale_fill_gradient2(low = "steelblue", mid = "white", high = "tomato",
+                       midpoint = 0, limits = c(-1, 1)) +
+  labs(title = "Pearson correlation between quantitative variables",
+       x = NULL, y = NULL, fill = "r")
+```
+
+Only the five truly quantitative variables are included (`age`, `trestbps`, `chol`, `thalach`, `oldpeak`); the rest are categories encoded as numbers, for which a Pearson correlation is meaningless. The strongest correlation is the negative one between age and maximum heart rate (r = -0.40): older patients reach a lower maximum heart rate during the stress test, which is expected because the heart's capacity to accelerate declines with age. It is followed by `thalach` and `oldpeak` (r = -0.35), meaning that patients with greater exercise-induced ST depression tend to reach a lower maximum heart rate. The remaining correlations are weak, so these variables are fairly independent of each other. Correlation measures only linear association and does not imply causation.
+
+# Session information
+
+```{r session-info}
+sessionInfo()
+```
