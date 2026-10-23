@@ -30,8 +30,8 @@ Each lab folder contains its own `README.md` with the list of deliverables, rend
 
 | Assignment | Directory | Core Focus & Topics | Status |
 | :---: | :--- | :--- | :---: |
-| **Lab 01** | [`lab_01_r_environment/`](./lab_01_r_environment/) | R & RStudio setup, RMarkdown, data structures, wrangling, ggplot2, linear regression, and ANOVA. | 🟡 In Progress |
-| **Lab 2** | [`lab_02_programming_probability/`](./lab_02_programming_probability/) | R syntax & logic, custom functions, database access, probability distributions, and sampling simulations. | ⚪ Pending |
+| **Lab 01** | [`lab_01_r_environment/`](./lab_01_r_environment/) | R & RStudio setup, RMarkdown, data structures, wrangling, ggplot2, linear regression, and ANOVA. | 🟢 Completed |
+| **Lab 2** | [`lab_02_programming_probability/`](./lab_02_programming_probability/) | R syntax & logic, custom functions, database access, probability distributions, and sampling simulations. | 🟡 In Progress | 
 | **Lab 3** | [`lab_03_machine_learning_omics/`](./lab_03_machine_learning_omics/) | Machine learning, deep learning, ANOVA, Shiny apps, and Bioconductor biosanitary packages. | ⚪ Pending |
 | **Lab 4** | [`lab_04_final_project/`](./lab_04_final_project/) | End-to-end integrative bioinformatics & health data science capstone project. | ⚪ Pending |
 
