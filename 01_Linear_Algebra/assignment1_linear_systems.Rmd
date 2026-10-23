@@ -16,14 +16,15 @@ library(ggplot2)
 
 # Overview
 
-This report applies the theory of **linear systems** to two classic problems:
+This report applies the theory of **linear systems** to three classic problems:
 
 | Part | Problem | Linear-algebra idea |
 |------|---------|---------------------|
 | 1 | Simple linear regression on two datasets | Overdetermined system solved by least squares (normal equations) |
 | 2 | Steady-state temperature of a metal plate | Square, sparse, symmetric system $A\mathbf{t} = \mathbf{b}$ with a unique solution |
+| 3 | Image reconstruction in computed tomography | Rank, free parameters and null space: when do the measurements determine the image? |
 
-**Tools:** R, `ggplot2`, base `lm()` / `solve()` / `qr()`.
+**Tools:** R, `ggplot2`, `pracma` (`rref()`), base `lm()` / `solve()` / `qr()` / `qr.solve()`.
 
 ---
 
@@ -95,7 +96,6 @@ coef(model_a)
 # The closed-form solution must agree with lm()
 all.equal(unname(ols_line(x_a, y_a)), unname(coef(model_a)))
 
-# Goodness of fit
 summary(model_a)$r.squared
 ```
 
@@ -223,7 +223,7 @@ isSymmetric(A)
 ## Solving the system and discussing its type
 
 By the Rouché-Frobenius theorem, the system has a unique solution when
-$\mathrm{rank}(A) = \mathrm{rank}([A \mid \mathbf{b}]) = $ number of unknowns.
+rank(A) = rank([A | b]) = number of unknowns.
 
 ```{r solve}
 # 1. Classify the system
@@ -276,17 +276,148 @@ round(corners, 2)
 
 ---
 
-# Conclusions
+# Part 3. Final problem: CT image reconstruction
 
-- Least-squares regression reduces to a $2 \times 2$ linear system whose solution is
-  $a = \mathrm{cov}(x, y)/\mathrm{var}(x)$ and $b = \bar{y} - a\bar{x}$; it matches `lm()` exactly.
-- $R^2$ quantifies fit quality: Dataset A shows a strong linear trend ($R^2 \approx 0.84$),
-  whereas Dataset B shows a weak association ($R^2 \approx 0.21$).
-- The plate problem is a square, symmetric, sparse system with a unique solution; checking
-  `rank(A)` against `rank([A | b])` before calling `solve()` is the practical form of the
-  Rouché-Frobenius discussion.
-- For larger grids, direct elimination becomes expensive, which motivates iterative methods
-  (Jacobi, Gauss-Seidel) and sparse matrix storage.
+## Problem statement (summary)
+
+Computed tomography (CT) reconstructs an image of the inside of an object from many X-ray
+measurements taken from different angles. In a simplified model, a grayscale image is a grid of
+pixels with unknown non-negative values (their attenuation), and every X-ray measurement is the
+**sum of the pixels it crosses**. Each ray therefore gives one linear equation, and reconstructing the
+image means solving the system formed by all the measurements.
+
+Consider a $2 \times 2$ image with unknown pixels $x_1, x_2, x_3, x_4$ (numbered by rows) and a
+scanner that initially emits only horizontal and vertical rays:
+
+$$
+\begin{pmatrix} x_1 & x_2 \\ x_3 & x_4 \end{pmatrix},
+\qquad
+x_1 + x_2 = 5,\quad x_3 + x_4 = 3,\quad x_1 + x_3 = 4,\quad x_2 + x_4 = 4 .
+$$
+
+The questions are when the measurements determine the image uniquely, and how to reconstruct it.
+Pixel values are real numbers (the systems are studied over $\mathbb{R}$) and, to be interpreted as
+attenuations, they must be **non-negative**.
+
+## Matrix formulation
+
+The system is $A\mathbf{x} = \mathbf{b}$, with one row of $A$ per ray:
+
+$$
+\underbrace{\begin{pmatrix}
+1&1&0&0\\
+0&0&1&1\\
+1&0&1&0\\
+0&1&0&1
+\end{pmatrix}}_{A}
+\underbrace{\begin{pmatrix}x_1\\x_2\\x_3\\x_4\end{pmatrix}}_{\mathbf{x}}
+=
+\underbrace{\begin{pmatrix}5\\3\\4\\4\end{pmatrix}}_{\mathbf{b}}
+$$
+
+The augmented matrix is $M = (A \,|\, \mathbf{b})$.
+
+```{r ct-system}
+A_ct <- matrix(c(1, 1, 0, 0,
+                 0, 0, 1, 1,
+                 1, 0, 1, 0,
+                 0, 1, 0, 1), nrow = 4, byrow = TRUE)
+b_ct <- c(5, 3, 4, 4)
+M_ct <- cbind(A_ct, b_ct)
+M_ct
+```
+
+## Rank and discussion (Rouché-Frobenius)
+
+```{r ct-ranks}
+qr(A_ct)$rank              # rank of A
+qr(M_ct)$rank              # rank of the augmented matrix
+ncol(A_ct) - qr(A_ct)$rank # degrees of freedom
+```
+
+rank(A) = rank(M) = 3 < 4 unknowns, so the system is **compatible indeterminate**:
+it has infinitely many solutions, with $4 - 3 = 1$ **degree of freedom**.
+
+The two horizontal rays and the two vertical rays both measure the total of the image
+($5 + 3 = 4 + 4 = 8$), so one of the four equations is redundant: the scanner provides only
+three independent pieces of information for four pixels.
+
+## Gaussian elimination and general solution
+
+```{r ct-rref}
+library(pracma)
+rref(M_ct)   # reduced row echelon form of [A | b]
+```
+
+The reduced form gives $x_1 - x_4 = 1$, $x_2 + x_4 = 4$, $x_3 + x_4 = 3$, and a zero row.
+Taking the free variable $x_4 = \lambda$:
+
+$$
+(x_1, x_2, x_3, x_4) = (1 + \lambda,\; 4 - \lambda,\; 3 - \lambda,\; \lambda),
+\qquad \lambda \in \mathbb{R},
+$$
+
+or, in vector form,
+
+$$
+\mathbf{x} = \begin{pmatrix}1\\4\\3\\0\end{pmatrix} + \lambda\begin{pmatrix}1\\-1\\-1\\1\end{pmatrix}.
+$$
+
+The direction $(1, -1, -1, 1)$ is a checkerboard pattern: every horizontal or vertical ray crosses
+one pixel that increases and one that decreases, so the effects cancel and the scanner cannot see
+it. It belongs to the **null space** of $A$.
+
+```{r ct-check}
+x_particular <- c(1, 4, 3, 0)
+direction    <- c(1, -1, -1, 1)
+
+# The direction must be invisible to the scanner: A %*% direction = 0
+as.vector(A_ct %*% direction)
+
+# Any member of the family reproduces the measurements
+lambdas <- c(0, 1, 2.5, 3)
+all(vapply(lambdas, function(l) {
+  isTRUE(all.equal(as.vector(A_ct %*% (x_particular + l * direction)), b_ct))
+}, logical(1)))
+```
+
+**Non-negative pixels.** Requiring $x_i \ge 0$ gives $\lambda \ge -1$, $\lambda \le 4$,
+$\lambda \le 3$ and $\lambda \ge 0$, that is, $0 \le \lambda \le 3$. There are still infinitely many
+valid images: for example $\lambda = 0$ gives $\begin{pmatrix}1&4\\3&0\end{pmatrix}$ and
+$\lambda = 1$ gives $\begin{pmatrix}2&3\\2&1\end{pmatrix}$, and both produce exactly the same four
+measurements.
+
+## Adding the main-diagonal ray
+
+The scanner is improved with one more ray along the main diagonal, measuring $x_1 + x_4 = 5$.
+The new system has 5 equations and 4 unknowns.
+
+```{r ct-diagonal}
+A_ct5 <- rbind(A_ct, c(1, 0, 0, 1))
+b_ct5 <- c(5, 3, 4, 4, 5)
+
+dim(A_ct5)
+qr(A_ct5)$rank                 # rank of A
+qr(cbind(A_ct5, b_ct5))$rank   # rank of the augmented matrix
+
+# solve() needs a square matrix; qr.solve() also handles 5 x 4 systems
+x_img <- qr.solve(A_ct5, b_ct5)
+x_img
+
+# Verify that the solution reproduces all five measurements
+all.equal(as.vector(A_ct5 %*% x_img), b_ct5)
+```
+
+rank(A) = rank(M) = 4 = number of unknowns, so the system is **compatible determinate**: the
+image is unique. The diagonal ray is independent of the previous ones and it detects the
+checkerboard pattern (it measures $1 + 1 = 2 \neq 0$ on it), which removes the free parameter.
+This corresponds to $\lambda = 2$ in the general solution above, and the reconstructed image is
+
+$$
+\begin{pmatrix}3 & 2\\1 & 2\end{pmatrix},
+$$
+
+which has non-negative pixels and is therefore a valid image.
 
 # Session information
 
