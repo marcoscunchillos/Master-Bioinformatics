@@ -23,7 +23,7 @@ Lab 01 consists of two practices and a final deliverable.
 | Deliverable | Source | Rendered Report | Status |
 | :--- | :--- | :---: | :---: |
 | **Practice 01:** R fundamentals | [`practice_01_r_fundamentals.Rmd`](./practice_01_r_fundamentals.Rmd) | [📄 View report](https://marcoscunchillos.github.io/UOC-Master-Bioinformatics/03_Software_for_Data_Analysis/lab_01_r_environment/practice_01_r_fundamentals.html) | 🟢 Completed |
-| **Practice 02** | [`practice_02_descriptive_graphics.Rmd`](./practice_02_descriptive_graphics.Rmd)  |  [📄 View report](https://marcoscunchillos.github.io/UOC-Master-Bioinformatics/03_Software_for_Data_Analysis/lab_01_r_environment/practice_02_descriptive_graphics.html)  | 🟢 Completed |
-| **Final deliverable** | [`final_derivable_01.Rmd`] | [📄 View report](https://marcoscunchillos.github.io/UOC-Master-Bioinformatics/03_Software_for_Data_Analysis/lab_01_r_environment/final_deliverable_01.html)   | 🟢 Completed |
+| **Practice 02**  Descriptive statistics & graphics  | [`practice_02_descriptive_graphics.Rmd`](./practice_02_descriptive_graphics.Rmd)  |  [📄 View report](https://marcoscunchillos.github.io/UOC-Master-Bioinformatics/03_Software_for_Data_Analysis/lab_01_r_environment/practice_02_descriptive_graphics.html)  | 🟢 Completed |
+| **Final deliverable** Heart disease & `esoph` EDA | [`final_deliverable_01.Rmd`](./final_deliverable_01.Rmd) | [📄 View report](https://marcoscunchillos.github.io/UOC-Master-Bioinformatics/03_Software_for_Data_Analysis/lab_01_r_environment/final_deliverable_01.html) | 🟢 Completed |
 
 ---
