@@ -514,10 +514,20 @@ all(vapply(lambdas, function(l) {
 
 **Non-negative pixels.** Requiring $x_i \ge 0$ gives $\lambda \ge -1$,
 $\lambda \le 4$, $\lambda \le 3$ and $\lambda \ge 0$, that is,
-$0 \le \lambda \le 3$. There are still infinitely many valid images: for
-example $\lambda = 0$ gives $\begin{pmatrix}1&4\\3&0\end{pmatrix}$ and
-$\lambda = 1$ gives $\begin{pmatrix}2&3\\2&1\end{pmatrix}$, and both
-produce exactly the same four measurements.
+$0 \le \lambda \le 3$. There are still infinitely many valid images, and
+all of them produce exactly the same four measurements. For example:
+
+For $\lambda = 0$:
+
+$$
+\begin{pmatrix}1&4\\3&0\end{pmatrix}
+$$
+
+For $\lambda = 1$:
+
+$$
+\begin{pmatrix}2&3\\2&1\end{pmatrix}
+$$
 
 ## Adding the main-diagonal ray
 
