@@ -1,0 +1,293 @@
+---
+title: "PEC de práctica autónoma - Software para el Análisis de Datos"
+author: "Marcos Cunchillos Just"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Normas del juego (léelas antes de empezar) 
+
+El objetivo no es entregar nada, sino que **seas capaz de hacerlo tú solo**. Esta PEC tiene la misma estructura que la anterior, pero con datos distintos, así que no puedes copiar nada: tienes que volver a pensar cada paso.
+
+1. **Nada de IA mientras resuelves.** Tus únicas ayudas permitidas son `?función`, los apuntes de la UOC y tus propias PEC/prácticas anteriores.
+2. **Primero escribe, luego mira.** Si te atascas más de 15 minutos, anota en un comentario *qué intentabas hacer y qué error te sale*. Eso es lo que me traerás después.
+3. **Usa solo lo que ya has visto** en clase o en la PEC anterior (`table`, `prop.table`, `subset`, `sapply`, `boxplot`, `hist`, `ggplot`, `cor`...). Si no la has dado, no la uses.
+4. **Interpreta con tus palabras.** Cada ejercicio termina con un comentario escrito por ti, no solo con código.
+5. Al final de cada ejercicio hay unos **puntos de control** con resultados numéricos. Si tu resultado no coincide, no lo corrijas copiando: busca por qué difiere.
+6. Cuando termines, súbeme el `.Rmd` y lo corrijo como lo haría un profesor: te diré qué has hecho bien y te daré pistas, no soluciones.
+
+**Tiempo orientativo:** 4-5 horas repartidas en 2-3 sesiones. Hazlo en un `.Rmd` nuevo.
+
+**Paquetes:** `library(MASS)`, `library(readr)`, `library(ggplot2)`.
+
+---
+
+# Sección 1. Importación, exportación y gestión de datos
+
+## Ejercicio 1
+
+Trabajarás con `airquality` (paquete `datasets`): mediciones diarias de calidad del aire en Nueva York entre mayo y septiembre de 1973 (ozono, radiación solar, viento, temperatura).
+
+### 1.1.
+
+> Cargue `airquality` en un data frame llamado `aire`. Muestre los 8 primeros y los 4 últimos registros.
+
+```{r}
+data("airquality")
+airquality[1:8,]
+tail(airquality)
+```
+
+### 1.2.
+
+> Describa el conjunto de datos: variables, tipo de cada una, tamaño de la muestra y valores ausentes **por variable**. Indique cuál es la proporción de valores ausentes de la variable con más `NA`.
+
+```{r}
+str(airquality)
+sum(is.na(airquality)) #Total de valores ausentes
+#Valores ausentes en las variables (seguro que se puede hacer de una manera más eficiente)
+sum(is.na(airquality$Ozone))
+sum(is.na(airquality$Solar.R))
+sum(is.na(airquality$Wind))
+sum(is.na(airquality$Temp))
+sum(is.na(airquality$Month))
+sum(is.na(airquality$Day))
+
+#Calcular proporción
+sum(is.na(airquality$Ozone))/sum(is.na(airquality))
+```
+Las variables son todas numéricas y son ozono, radiación solar, viento, temperatura, mes y día. El tamaño de la muestra es 153. La variable con más valores ausentes es la de "ozono", con 37 valores ausentes, lo que representa un 84% de todos los NA de la muestra. 
+
+### 1.3.
+
+> Calcule la media de `Ozone` de dos formas: sin tratar los `NA` y tratándolos con el argumento adecuado. Explique por qué da un resultado distinto en cada caso. Después compare el número de filas de `airquality` con el de `na.omit(airquality)` y explique en 8-10 líneas qué información se pierde y qué sesgo podría introducir eliminar esas filas (piense en qué días puede fallar el sensor).
+
+```{r}
+mean(airquality$Ozone)
+mean(na.omit(airquality$Ozone))
+
+dim(na.omit(airquality))
+dim(airquality)
+```
+
+Al tratar los NA como un argument adecuado, el programa devuelve NA al calcular la media, mientras que si no se considera un argumento adecuado sí que se puede calcular. Si omitimos los valores ausentes, la muestra pasa de 153 a 111, una reducción considerable. El hecho de solo utilizar recuentos en los que se hayan medido todas las variables puede introducir un importante sesgo de seleccción. En este caso, puede haber un sesgo por barrios en los que las condiciones climáticas son peores, y por tanto no se puede estudiar tanto como se debería, infraestimando la contaminación de Nueva York. También puede introducir un sesgo socioeconómico, y es que es probable que los barrios con menos recursos tengan menos cetrales de análisis de datos meteorológicos, lo que traería un importante sesgo donde estaríamos analizando solo las zonas ricas de la ciudad. 
+
+### 1.4.
+
+> Cree una nueva columna `temp_celsius` a partir de `Temp` (que está en grados Fahrenheit) y una columna `ozono_alto` (factor con niveles "No"/"Sí") que sea "Sí" si el ozono supera 60 ppb. Cuidado con los `NA`. Exporte el resultado a `output/aire_modificado.csv` **sin** índice de filas, y vuelva a importarlo con `read_csv` para comprobar que está bien.
+
+```{r}
+#Crear las nueva columnas
+airquality$temp_celsius <- (airquality$Temp-32)*0.5556
+airquality$ozono_alto <- factor(ifelse(airquality$Ozone > 60, "Sí","No"))
+
+#Exportar los resultados
+dir.create("output")
+write.csv(airquality,file = "output/airquality_modified.csv", row.names = FALSE)
+
+#Leer el archivo
+read.csv(airquality_modified)
+
+```
+No se por qué no se me ha creado el archivo
+
+**Puntos de control:** 153 filas y 6 columnas; la variable con más `NA` es `Ozone` (37); la media de ozono ignorando NA es 42,13; `na.omit` deja 111 filas.
+
+## Ejercicio 2
+
+Trabajarás con `infert` (paquete `datasets`): estudio de casos y controles sobre infertilidad en mujeres tras abortos espontáneos e inducidos. Aquí **cada fila sí es una mujer** (a diferencia de `esoph`).
+
+### 2.1.
+
+> Explique qué contiene `infert` (usa `str`, `?infert` y `head`). Indique cuántos casos y controles hay y qué variables son factores y cuáles numéricas.
+
+```{r}
+data("infert")
+head(infert)
+str(infert)
+```
+
+Hay 248 casos y controles. Además todas son numéricas menos "education" que es un factor.
+
+### 2.2.
+
+> Cree una variable `abortos_inducidos` con tres categorías ("Ninguno", "Uno", "Dos o más") a partir de `induced`, **sin usar `ifelse` anidados** (pista: mira la función `cut` o piensa en cómo usar `factor` con `levels` y `labels`). Haga una tabla de frecuencias de esa variable frente a `case` y calcule la proporción de casos dentro de cada categoría.
+
+```{r}
+#Introducir variable
+abortos_inducidos <- factor(infert$induced)
+levels(abortos_inducidos) <- c("Ninguno", "Uno", "Dos o más")
+infert$abortos_inducidos <- abortos_inducidos
+
+#Crear tabla de frecuencias
+tabla_abortos <- table(infert$abortos_inducidos, infert$case)
+prop.table(tabla_abortos, margin = 1)
+```
+
+*Tu comentario (¿parece haber relación?):*
+No, la proporción de infertiliad es más o menos igual independientemente del número de abortos inducidos.
+
+### 2.3.
+
+> Reflexión (10-15 líneas): `infert` y `esoph` son estudios de casos y controles. ¿Por qué en un estudio de casos y controles **no se puede** calcular directamente la prevalencia de la enfermedad en la población a partir de la proporción de casos de la muestra? ¿Qué pasaría si cambiáramos el número de controles que incluimos?
+
+No lo sé.
+
+**Puntos de control:** 248 filas; 83 casos y 165 controles; la proporción de casos por categoría de abortos inducidos es aproximadamente 0,33 (ninguno), 0,34 (uno) y 0,35 (dos o más), así que casi no varía.
+
+---
+
+# Sección 2. Análisis básico del conjunto de datos
+
+## Ejercicio 3
+
+Trabajarás con `Pima.tr` (paquete `MASS`): 200 mujeres de ascendencia pima, evaluadas por diabetes. Cree primero un data frame llamado `pima` a partir de él. Variables: `npreg` (embarazos), `glu` (glucosa en plasma), `bp` (presión diastólica), `skin` (pliegue cutáneo), `bmi` (IMC), `ped` (antecedentes familiares de diabetes), `age` y `type` (diabetes: Yes/No).
+
+### 3.1.
+
+> Calcule la proporción de mujeres con y sin diabetes (`type`) dentro de cada grupo de **número de embarazos**: `npreg < 4` frente a `npreg >= 4`. Comente los resultados.
+
+```{r}
+library(MASS)
+pima <- data.frame(Pima.tr)
+
+#Separar grupos por número de embarazos
+pima$numero_embarazos <- ifelse(pima$npreg < 4, "Pocos", "Muchos")
+
+#Proporciones
+tabla_embarazo <- table(pima$numero_embarazos, pima$type)
+prop.table(tabla_embarazo, margin = 1)
+```
+
+La proporción de diabetes es casi del doble en mujeres que han tenido 4 o más embarazos, por lo que hay una correlación, que no implica causalidad.
+
+### 3.2.
+
+> Represente con un gráfico de barras (ggplot2) la proporción de mujeres con diabetes según los grupos de edad `< 30`, `30-39` y `>= 40`. Cree antes la variable de grupo de edad. Todo el gráfico debe tener título, ejes y leyenda en español.
+
+```{r}
+#Crear grupos de edad
+pima$grupos_edad <- ifelse(pima$age < 30, "< 30",
+                           ifelse(pima$age <40, "30-39", ">=40"))
+
+#Crear gráfico
+library(ggplot2)
+ggplot(pima, aes(x = grupos_edad, fill = type))+
+  geom_bar(colour = "blue", fill = "lightblue")+
+  labs(x = "Edad", y = "Diabetes", main = "Relación edad-diabetes")
+```
+
+Se observa como claramente los casos de diabetes van bajando con la edad. Puede ser debido a una mortalidad juvenil alta.
+
+### 3.3.
+
+> Muestre en una tabla el número de mujeres **con diabetes** cuyo IMC supera la media de toda la muestra, agrupadas por grupo de edad.
+
+```{r}
+
+```
+
+### 3.4.
+
+> Calcule cuántas mujeres tienen glucosa superior a 140 mg/dl y a la vez no tienen diabetes. ¿Qué podrían representar estas mujeres desde el punto de vista clínico?
+
+```{r}
+
+```
+
+*Tu comentario:*
+
+### 3.5.
+
+> Reflexión (10-15 líneas): la muestra son solo 200 mujeres de una población concreta. ¿Se podría usar un modelo entrenado con estos datos para predecir diabetes en mujeres europeas? Razone qué precauciones tomaría.
+
+*Tu respuesta:*
+
+**Puntos de control:** 68 con diabetes y 132 sin; con `npreg >= 4` la proporción con diabetes es 0,474 frente a 0,254 con `npreg < 4`; la media del IMC es 32,31; hay 37 diabéticas con edad >= 40 y 19 no diabéticas con edad >= 40.
+
+---
+
+# Sección 3. Estadística descriptiva y gráficos
+
+## Ejercicio 4
+
+Sigue con `pima`.
+
+### 4.1.
+
+> Obtenga media, desviación estándar, mediana, cuartiles y rango intercuartílico de `glu`, `bp`, `bmi` y `age`. Haga los diagramas de caja correspondientes y comente si hay asimetría o valores atípicos.
+
+```{r}
+
+```
+
+*Tu comentario:*
+
+### 4.2.
+
+> Diagrama de cajas de la glucosa (`glu`) según la presencia de diabetes. ¿Qué conclusión puede extraer?
+
+```{r}
+
+```
+
+*Tu comentario:*
+
+### 4.3.
+
+> Construya la tabla de frecuencias cruzadas entre el grupo de edad (creado en 3.2) y la presencia de diabetes, y represéntela mediante un mapa de calor con `geom_tile` y los números dentro de cada celda.
+
+```{r}
+
+```
+
+*Tu comentario:*
+
+### 4.4.
+
+> Histograma del IMC (`bmi`) solo de las mujeres **con** diabetes, con la curva de densidad empírica y la curva normal teórica superpuestas. Realice el Q-Q plot y el test de Shapiro-Wilk. ¿Se puede asumir normalidad?
+
+```{r}
+
+```
+
+*Tu comentario:*
+
+### 4.5.
+
+> Matriz de correlación entre todas las variables cuantitativas (excepto `type`) y gráfico de correlación. ¿Qué par de variables tiene la correlación más fuerte y cuál sería su interpretación? ¿Es esperable la segunda mayor correlación? Razónelo.
+
+```{r}
+
+```
+
+*Tu comentario:*
+
+**Puntos de control:** media de `glu` = 124,0 y mediana = 120,5; mediana de `glu` en diabéticas = 144,0 y en no diabéticas = 109,5; p-valor de Shapiro-Wilk de `bmi` en diabéticas = 0,883; la correlación más fuerte es `skin`-`bmi` (0,66) y la segunda `npreg`-`age` (0,60).
+
+---
+
+# Autoevaluación (rellénala al terminar)
+
+Marca con sinceridad:
+
+| Habilidad | Lo hice solo | Con ayuda de apuntes | No supe |
+| :--- | :---: | :---: | :---: |
+| Importar/exportar CSV y revisar `NA` | | | |
+| Crear variables y factores sin copiar | | | |
+| `table` + `prop.table` (margin 1 o 2) | | | |
+| Filtrar con `subset` / condiciones lógicas | | | |
+| Estadísticos descriptivos con `sapply` | | | |
+| Boxplots e histogramas en base R | | | |
+| Gráficos con `ggplot` (`geom_col`, `geom_tile`, `geom_boxplot`) | | | |
+| Normalidad (Shapiro + Q-Q) | | | |
+| Matriz de correlación e interpretación | | | |
+
+Lo que marques en "No supe" es exactamente lo que repasaremos juntos.
