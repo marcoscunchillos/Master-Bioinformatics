@@ -191,6 +191,12 @@ Se observa como claramente los casos de diabetes van bajando con la edad. Puede 
 > Muestre en una tabla el número de mujeres **con diabetes** cuyo IMC supera la media de toda la muestra, agrupadas por grupo de edad.
 
 ```{r}
+#Crear un subgrupo para mujeres con diabetes e IMC superior a la media
+media_IMC <- mean(pima$bmi)
+pima_IMC <- subset(pima, pima$bmi>media_IMC & pima$type=="Yes")
+
+#Crear una tabla 
+table(pima_IMC$grupos_edad)
 
 ```
 
@@ -199,16 +205,17 @@ Se observa como claramente los casos de diabetes van bajando con la edad. Puede 
 > Calcule cuántas mujeres tienen glucosa superior a 140 mg/dl y a la vez no tienen diabetes. ¿Qué podrían representar estas mujeres desde el punto de vista clínico?
 
 ```{r}
-
+nrow(subset(pima, pima$glu>140 & pima$type=="No"))
 ```
 
-*Tu comentario:*
+De las 200 mujeres analizadas, solo 20 tienen unos niveles de glucosa altos y no tienen la enfermedad. Desde el punto de vista clínico, si este número fuera muy alto, podría indicar que los altos niveles de glucosa podrían ser una característica intrínseca de esta etnia, y por tanto podría no deberse a la supuesta diabetes. 
 
 ### 3.5.
 
 > Reflexión (10-15 líneas): la muestra son solo 200 mujeres de una población concreta. ¿Se podría usar un modelo entrenado con estos datos para predecir diabetes en mujeres europeas? Razone qué precauciones tomaría.
 
-*Tu respuesta:*
+No. Esta muestra es de una población muy lejana y diferente a la de las mujeres europeas. Con un estilo de vida y alimentación diferente es difícil predecir la diabetes de forma óptima. Para ello habría que o hacer un estudio similar solo para Europa, o añadir una muestra considerable de mujeres europeas a este experimento para tener un modelo de predicción más universal. 
+
 
 **Puntos de control:** 68 con diabetes y 132 sin; con `npreg >= 4` la proporción con diabetes es 0,474 frente a 0,254 con `npreg < 4`; la media del IMC es 32,31; hay 37 diabéticas con edad >= 40 y 19 no diabéticas con edad >= 40.
 
@@ -225,30 +232,53 @@ Sigue con `pima`.
 > Obtenga media, desviación estándar, mediana, cuartiles y rango intercuartílico de `glu`, `bp`, `bmi` y `age`. Haga los diagramas de caja correspondientes y comente si hay asimetría o valores atípicos.
 
 ```{r}
+variables <- pima[, c("glu","bp","bmi","age")]
 
+estadisticos <- data.frame(
+  Media    = sapply(variables, mean),
+  Desv_est = sapply(variables, sd),
+  Mediana  = sapply(variables, median),
+  Q1       = sapply(variables, function(x) quantile(x, 0.25)),
+  Q3       = sapply(variables, function(x) quantile(x, 0.75)),
+  RIC      = sapply(variables, IQR)
+)
+round(estadisticos,2)
+
+#Hacer los gráficos
+par(mfrow = c(2,2))
+boxplot(pima$glu, main = "Glucosa", xlab = "mg/dL")
+boxplot(pima$bp, main = "Presión Sanguínea")
+boxplot(pima$bmi, main = "Índice de masa corporal")
+boxplot(pima$age, main = "Edad", xlab = "Años")
 ```
 
-*Tu comentario:*
+Las únicas cosas a destacar son que la muestra no es simétrica en cuanto a la edad y que en la presion sanguínea hay algunos outsiders.
 
 ### 4.2.
 
 > Diagrama de cajas de la glucosa (`glu`) según la presencia de diabetes. ¿Qué conclusión puede extraer?
 
 ```{r}
-
+ggplot(pima, aes(x=glu, fill = type))+
+  geom_boxplot()
 ```
-
-*Tu comentario:*
+Las cajas, diferenciadas según la presencia o ausencia de enfermedad, prácticamente no se solapan, lo que indica que la glucosa es sangre es claramente superior en mujeres con diabetes.
 
 ### 4.3.
 
 > Construya la tabla de frecuencias cruzadas entre el grupo de edad (creado en 3.2) y la presencia de diabetes, y represéntela mediante un mapa de calor con `geom_tile` y los números dentro de cada celda.
 
 ```{r}
+pima_edad <- table(factor(pima$grupos_edad), factor(pima$type))
+pima_edad_prop <- as.data.frame(prop.table(pima_edad))
+
+ggplot(pima_edad_prop, aes(x = Var1, y = Var2, fill = Freq))+
+  geom_tile(colour = "white")+
+  labs(title = "Frecuencias edad-diabetes", x = "Edad", y = "Diabetes")
 
 ```
 
-*Tu comentario:*
+La mayor frecuencia se da claramente, en el grupo de mujeres de menos de 30 años sin diabetes, con un 0.450.
 
 ### 4.4.
 
@@ -280,13 +310,13 @@ Marca con sinceridad:
 
 | Habilidad | Lo hice solo | Con ayuda de apuntes | No supe |
 | :--- | :---: | :---: | :---: |
-| Importar/exportar CSV y revisar `NA` | | | |
-| Crear variables y factores sin copiar | | | |
-| `table` + `prop.table` (margin 1 o 2) | | | |
-| Filtrar con `subset` / condiciones lógicas | | | |
-| Estadísticos descriptivos con `sapply` | | | |
-| Boxplots e histogramas en base R | | | |
-| Gráficos con `ggplot` (`geom_col`, `geom_tile`, `geom_boxplot`) | | | |
+| Importar/exportar CSV y revisar `NA` | |X | |
+| Crear variables y factores sin copiar |X | | |
+| `table` + `prop.table` (margin 1 o 2) | | X| |
+| Filtrar con `subset` / condiciones lógicas |X | | |
+| Estadísticos descriptivos con `sapply` | | X| |
+| Boxplots e histogramas en base R | | X| |
+| Gráficos con `ggplot` (`geom_col`, `geom_tile`, `geom_boxplot`) | | x| |
 | Normalidad (Shapiro + Q-Q) | | | |
 | Matriz de correlación e interpretación | | | |
 
