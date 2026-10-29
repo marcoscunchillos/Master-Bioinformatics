@@ -170,7 +170,6 @@ Fuma <- c(
 )
 
 Trat_Pulmon <- data.frame(Identificador, Edad, Sexo, Peso, Alt, Fuma)
-Trat_Pulmon
 ```
 
 **a)** Select the records with age > 22.
