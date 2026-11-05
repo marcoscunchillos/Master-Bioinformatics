@@ -122,3 +122,81 @@ porcentaje_tratamiento <- prop.table(tabla_tratamiento)
 round(porcentaje_tratamiento, 2) * 100
 ```
 
+###Ejercicio 4:
+A	partir	del	conjunto	de	datos	birthwt del	paquete	MASS,	calculad	cuántos	recién	nacidos	con	un	 peso	 inferior	 a	 2.600	 gramos	 corresponden	 a	 madres	 menores	 de	 veinte años y	fumadoras.
+```{r}
+data("birthwt", package = "MASS")
+bebes <- birthwt %>%
+  filter(bwt < 2600 & age < 20 & smoke == 1)
+nrow(bebes)
+```
+
+```{r}
+c_inf <- 0
+
+for(i in 1:nrow(birthwt)) {
+  if (birthwt$bwt[i] < 2600) {
+    if (birthwt$age[i] < 20 ) {
+      if (birthwt$smoke[i] == 1)
+        c_inf <- c_inf + 1
+    }
+  }
+}
+
+
+#Mostramos el resultado
+print(c_inf)
+
+```
+
+###Ejercicio 5:
+Supongamos	 que	 queremos	 generar	 un	 registro	 médico	 de	 pacientes	 que	 incluya	
+información	 como	 nombre,	 edad,	 diagnóstico	 y	 niveles	 de	 glucosa	 en	 sangre,	 con los	siguientes	datos	de	pacientes:
+nombres	 <-	 c(«Ana»,	 «Luis»,	 «María»,	 «Carlos»,	 «Elena»)	 
+edades	 <-	 c(45,	 32,	 28,	 55,	 40)	
+diagnósticos	 <-	 c(«Diabetes»,	 «Hipertensión»,	 «Sano»,	 «Hipertensión»,	 «Asma»)	 glucosa	<-	c(125,	140,	95,	160,	110).	
+Definid	una	función	llamada	crear_registro_médico	que	tome	los	cuatro	vectores	anteriores	
+como	 argumentos	 (nombres,	 edades,	 diagnósticos	 y	 glucosa)	 y	 cree	 un	 data	 frame	que	representa	un	registro	médico	de	pacientes.	Finalmente,	el	resultado	por	pantalla	deberá	ser	un	 data	 frame	 que	 contiene	 información	 detallada	 sobre	 cada	 paciente, incluyendo	 su	nombre,	edad,	diagnóstico	y	niveles	de	glucosa	en	sangre.
+```{r}
+#Crear variables
+  nombres <- c("Ana", "Luis",	"Maria", "Carlos", "Elena") 
+  edades <- c(45,	 32,	 28,	 55,	 40)
+  diagnósticos <- c("Diabetes",	 "Hipertension",	 "Sano",	"Hipertension",	"Asma")
+  glucosa <- c(125,	140,	95,	160,	110)
+
+#Crear función 
+crear_registro_medico <- function(nombres, edades, diagnosticos, glucosa){
+  registro_medico <- data.frame(
+    Nombre = nombres,
+    Edad = edades,
+    Diagnóstico = diagnosticos,
+    Glucosa = glucosa,
+  )
+  return(registro_medico)
+}
+
+#Mostrar el registro médico
+print(registro_medico)
+```
+
+###Ejercicio 6:
+A	partir	del	conjunto	de	datos	birthwt del	paquete	MASS,	guardad	en	un	vector	los	pesos	de	los	recién	nacidos	cuyas	madres	tengan	menos	de	20	años.	Calculad	la	media	y	representad	gráficamente	este	vector	(por	ejemplo,	un	diagrama	de	puntos).	
+```{r}
+pesos_bebes <- c()
+j <- 1
+
+#Crear bucle para guardar los pesos
+for(i in 1:nrow(birthwt)) {
+  if(birthwt$age[i] < 20){
+    pesos_bebes[j] <- birthwt$bwt[i]
+    j <- j + 1
+  }
+}
+
+#Calcular la media
+mean(pesos_bebes)
+
+#Crear gráfica
+plot(pesos_bebes)
+```
+
