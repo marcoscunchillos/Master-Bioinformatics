@@ -200,3 +200,99 @@ mean(pesos_bebes)
 plot(pesos_bebes)
 ```
 
+###Ejercicio 7:
+Si	 consideramos	 el	 conjunto	 de	 datos	 birthwt del	 paquete	 MASS,	 cread	 una	 función	 que	muestre	los	valores	de	peso	de	los	recién	nacidos	cuyas	madres	sean	de	raza	blanca	y	cuyo	peso	esté	por	debajo	de	la	media	de	los	pesos	observados.	
+```{r}
+calcular_peso <- function(datos){
+  valores_peso <- datos %>%
+    filter(race == 1 & bwt < mean(bwt)) %>%
+    pull(bwt)
+  return(valores_peso)
+}
+
+calcular_peso(birthwt)
+```
+
+
+###Ejercicio 8:
+A	partir	del	conjunto	de	datos	Melanoma	del	paquete	MASS que	hace	referencia	a	los	datos	
+de	supervivencia	de	melanoma	maligno,	se	pide	resolver	las	siguientes	cuestiones:	
+a)	Definid	un	vector	que	guarde	las	edades	de	los	individuos	observados	y	calculad	la	media,	el	máximo	y	el	mínimo	de	esta	distribución.	
+```{r}
+data("Melanoma")
+
+#Crear vector
+edades <- c()
+j <- 1
+
+#Crear bucle
+for(i in 1:nrow(Melanoma)){
+  edades[j] <- Melanoma[i,4]
+  j <- j +1 
+}
+
+#Calcular media, máximo y mínimo
+cat("Edad máxima = ", max(edades), "\n")
+cat("Edad mínima = ", min(edades), "\n")
+cat("Edad media = ", mean(edades), "\n")
+  
+```
+
+b)	Definid	una	función	que	recorra	el	conjunto	de	datos	y	muestre	 cuántos	 de	 los	 individuos	 observados	 murieron	 a	 causa del	 melanoma,	 cuántos sobrevivieron	y	cuántos	murieron	por	diferentes	causas.	
+```{r}
+
+calcular_muertes <- function(datos) {
+  muertes <- 0
+  supervivientes <- 0
+  otras_causas <- 0
+  for (i in 1:nrow(datos)) {
+    if (datos$status[i] == 1) {
+      muertes <- muertes + 1
+    } else if (datos$status[i] == 2) {
+      supervivientes <- supervivientes + 1
+    } else if (datos$status[i] == 3) {
+      otras_causas <- otras_causas + 1
+    }
+  }
+  return(c(
+    melanoma = muertes,
+    supervivientes = supervivientes,
+    otras = otras_causas
+  ))
+}
+
+calcular_muertes(Melanoma)
+
+```
+
+c)	Definid	una	función	que	recorra	el	conjunto	de	datos	y	muestre	la	proporción	de	hombres	y	de	mujeres	que	murieron	por	melanoma
+
+```{r}
+calcular_genero_melanoma <- function(datos){
+  hombres <- 0
+  mujeres <- 0
+  muertes <- 0
+  for(i in 1:nrow(datos)){
+    if (datos$status[i] == 1){
+      muertes <- muertes +1
+      if (datos$sex[i] == 1){
+      hombres <- hombres + 1
+    } else {
+      mujeres <- mujeres +1
+    }
+    }
+  }
+   prop_m <- mujeres/muertes
+   prop_h <- hombres/muertes
+   
+  return(c(
+    proporcion_hombres = prop_h,
+    proporcion_mujeres = prop_m
+  ))
+}
+
+
+calcular_genero_melanoma(Melanoma)
+
+```
+
