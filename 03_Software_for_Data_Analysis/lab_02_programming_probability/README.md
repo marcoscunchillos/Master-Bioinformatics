@@ -22,8 +22,8 @@ Lab 02 consists of two practices and a final deliverable.
 
 | Deliverable | Source | Rendered Report | Status |
 | :--- | :--- | :---: | :---: |
-| **Practice 03:** Control structures & functions | [`practice_03_logic_functions.Rmd`](./practice_03_logic_functions.Rmd) | [📄 View report](https://marcoscunchillos.github.io/Master-Bioinformatics/03_Software_for_Data_Analysis/lab_02_programming_probability/practice_03_logic_functions.html) | 🟡 In Progress |
-| **Practice 04:** Probability & simulation | [`practice_04_probability_simulation.Rmd`](./practice_04_probability_simulation.Rmd) | [📄 View report](https://marcoscunchillos.github.io/Master-Bioinformatics/03_Software_for_Data_Analysis/lab_02_programming_probability/practice_04_probability_simulation.html) | ⚪ Pending |
+| **Practice 03:** Control structures & functions | [`practice_03_logic_functions.Rmd`](./practice_03_logic_functions.Rmd) | [📄 View report](https://marcoscunchillos.github.io/Master-Bioinformatics/03_Software_for_Data_Analysis/lab_02_programming_probability/practice_03_logic_functions.html) | 🟢 Completed |
+| **Practice 04:** Probability & simulation | [`practice_04_probability_simulation.Rmd`](./practice_04_probability_simulation.Rmd) | [📄 View report](https://marcoscunchillos.github.io/Master-Bioinformatics/03_Software_for_Data_Analysis/lab_02_programming_probability/practice_04_probability_simulation.html) | 🟡 In Progress |
 | **Final deliverable:** Programming & simulation project | [`final_deliverable_02.Rmd`](./final_deliverable_02.Rmd) | [📄 View report](https://marcoscunchillos.github.io/Master-Bioinformatics/03_Software_for_Data_Analysis/lab_02_programming_probability/final_deliverable_02.html) | ⚪ Pending |
 
 ---
