@@ -1,298 +1,642 @@
 ---
-title: 'Practice 03: Control structures & functions'
+title: "Practice 03: Control Structures, Functions and Database Access"
+subtitle: "Software for Data Analysis, Lab 02: Programming in R"
 author: "Marcos Cunchillos Just"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 7, fig.height = 4.5)
 ```
 
-```{r}
+# Overview
+
+This practice covers the core programming constructs of R (conditionals, loops and user-defined functions) applied to small biomedical problems, followed by SQL-based data access.
+
+| Block | Topic | Skills practiced |
+| :--- | :--- | :--- |
+| Exercises 1, 2 | Clinical data frame and reference tables | `dplyr` filtering, descriptive statistics, nested conditionals |
+| Exercises 3-4, 6-7 | `anorexia` and `birthwt` (package `MASS`) | Frequency tables, loops with counters, vector building |
+| Exercise 5 | Medical record constructor | Functions returning data frames |
+| Exercise 8 | `Melanoma` survival data | Functions that traverse a data frame and return named vectors |
+| Exercise 9 | `airquality` | SQL queries on a data frame with `sqldf` |
+| Case 1 | Fibonacci series and the DNA double helix | Iterative sequences, ratios and the golden ratio |
+| Case 2 | DNA sequences | String handling, reverse and complementary strands |
+| Case 3 | Hospital database | `DBI` + `SQLite`, `JOIN`, aggregation, `ggplot2` |
+
+```{r packages}
+# MASS is loaded first so that dplyr::select() is not masked by MASS::select()
+library(MASS)
 library(dplyr)
 library(DBI)
 library(RSQLite)
 library(sqldf)
-library(tidyr)
+library(ggplot2)
 ```
 
-### Ejercicio 1
+# Exercise 1. Patient data frame
 
-A partir de los datos siguientes de los pacientes de un hospital:
+> From the data of the hospital patients below, create a data frame and (1) filter the patients with cholesterol levels above 200, (2) compute descriptive statistics of the cholesterol levels.
+>
+> * **Patient1**: 45 years, Female, blood pressure 120/80, cholesterol 180
+> * **Patient2**: 32 years, Male, blood pressure 130/85, cholesterol 200
+> * **Patient3**: 28 years, Female, blood pressure 110/70, cholesterol 150
+> * **Patient4**: 55 years, Male, blood pressure 140/90, cholesterol 220
+> * **Patient5**: 40 years, Female, blood pressure 125/75, cholesterol 190
 
-* **Paciente1**: 45 años, Femenino, Presión: 120/80, Colesterol: 180
-* **Paciente2**: 32 años, Masculino, Presión: 130/85, Colesterol: 200
-* **Paciente3**: 28 años, Femenino, Presión: 110/70, Colesterol: 150
-* **Paciente4**: 55 años, Masculino, Presión: 140/90, Colesterol: 220
-* **Paciente5**: 40 años, Femenino, Presión: 125/75, Colesterol: 190
-
-Cread un data frame con los datos de los pacientes anteriores y:
-1. Filtrad los pacientes con niveles de colesterol por encima de 200.
-2. Calculad las estadísticas descriptivas de los niveles de colesterol de los pacientes.
-```{r}
-#Crear un data frame
-pacientes <- data.frame(
- Nombre = c("Paciente1", "Paciente2", "Paciente3", "Paciente4",
-"Paciente5"),
- Edad = c(45, 32, 28, 55, 40),
- Genero = c("Femenino", "Masculino", "Femenino", "Masculino", "Femenino"),
- Presión = c("120/80", "130/85", "110/70", "140/90", "125/75"),
- Colesterol = c(180, 200, 150, 220, 190)
+```{r exercise-1}
+patients <- data.frame(
+  name           = c("Patient1", "Patient2", "Patient3", "Patient4", "Patient5"),
+  age            = c(45, 32, 28, 55, 40),
+  gender         = c("Female", "Male", "Female", "Male", "Female"),
+  blood_pressure = c("120/80", "130/85", "110/70", "140/90", "125/75"),
+  cholesterol    = c(180, 200, 150, 220, 190)
 )
 
-#Filtrar los pacientes con niveles de colesterol por encima de 200
-colesterol_alto <- pacientes %>%
-  filter(Colesterol > 200)
+# Patients with cholesterol above 200 mg/dl
+high_cholesterol <- patients %>%
+  filter(cholesterol > 200)
+high_cholesterol
 
-#Calcular las estadísticas descriptivas de los niveles de colesterol de los pacientes
-estadisticas_colesterol <- pacientes %>%
-  summarize(
-    media_colesterol = mean(Colesterol),
-    mediana_colesterol = median(Colesterol),
-    maximo_colesterol = max(Colesterol),
-    minimi_colesterol = min(Colesterol),
-    desviacion_colesterol = sd(Colesterol)
+# Descriptive statistics of cholesterol
+cholesterol_stats <- patients %>%
+  summarise(
+    mean_cholesterol   = mean(cholesterol),
+    median_cholesterol = median(cholesterol),
+    max_cholesterol    = max(cholesterol),
+    min_cholesterol    = min(cholesterol),
+    sd_cholesterol     = sd(cholesterol)
   )
+cholesterol_stats
 ```
 
-### Ejercicio 2
-El porcentaje de grasa corporal óptima de un individuo depende de la edad y del género. A continuación se muestran los valores de referencia:
+Only Patient4 (220 mg/dl) exceeds the threshold; Patient2 is exactly at 200 and is excluded by the strict inequality.
 
-| Edad (años) | Mujer (%) | Hombre (%) |
-| :--- | :--- | :--- |
-| **10-30** | 20-26 | 12-18 |
-| **31-40** | 21-27 | 13-19 |
-| **41-50** | 22-28 | 14-20 |
-| **51-60** | 22-30 | 16-20 |
-| **61 o más** | 22-31 | 17-21 |
+# Exercise 2. Optimal body fat percentage
 
-> *Nota:* Estos valores pueden variar ligeramente según el origen de la publicación. *(Fuente: [Nutrición y Multinivel](http://nutricionymultinivel.blogspot.com/p/tablas-de-valores-de-la-organizacion.html))*
+> The optimal body fat percentage of an individual depends on age and gender. The reference values are:
+>
+> | Age (years) | Female (%) | Male (%) |
+> | :--- | :--- | :--- |
+> | **10-30** | 20-26 | 12-18 |
+> | **31-40** | 21-27 | 13-19 |
+> | **41-50** | 22-28 | 14-20 |
+> | **51-60** | 22-30 | 16-20 |
+> | **61 or more** | 22-31 | 17-21 |
+>
+> *Note:* these values may vary slightly depending on the source (Nutrición y Multinivel).
+>
+> Define variables that represent the age and gender of an individual and, depending on the values assigned, show the optimal body fat percentage given by the table above.
 
-Definid variables que representen la edad y el género de un individuo y, en función del valor que les asignéis, mostrad el porcentaje de masa corporal óptima que les correspondería con base en la tabla anterior.
-```{r}
-grasa_corporal_optima <- function(edad, genero) {
-  if (edad < 10) {
-    cat("Edad fuera del rango de la tabla (mínimo 10 años)\n")
-  } else if (genero == "Mujer") {
-    if (edad <= 30) {
-      cat("Grasa corporal óptima = 20-26 %\n")
-    } else if (edad <= 40) {
-      cat("Grasa corporal óptima = 21-27 %\n")
-    } else if (edad <= 50) {
-      cat("Grasa corporal óptima = 22-28 %\n")
-    } else if (edad <= 60) {
-      cat("Grasa corporal óptima = 22-30 %\n")
+```{r exercise-2}
+#' Show the optimal body fat percentage for an age and a gender
+#'
+#' Looks the individual up in the reference table with nested conditionals:
+#' gender first, then age range.
+#'
+#' @param age Numeric. Age in years (the table starts at 10).
+#' @param gender Character. Either "Female" or "Male".
+#' @return Nothing. The recommended range is printed to the console.
+optimal_body_fat <- function(age, gender) {
+  if (age < 10) {
+    cat("Age outside the range of the table (minimum 10 years)\n")
+  } else if (gender == "Female") {
+    if (age <= 30) {
+      cat("Optimal body fat = 20-26 %\n")
+    } else if (age <= 40) {
+      cat("Optimal body fat = 21-27 %\n")
+    } else if (age <= 50) {
+      cat("Optimal body fat = 22-28 %\n")
+    } else if (age <= 60) {
+      cat("Optimal body fat = 22-30 %\n")
     } else {
-      cat("Grasa corporal óptima = 22-31 %\n")
+      cat("Optimal body fat = 22-31 %\n")
     }
-  } else if (genero == "Hombre") {
-    if (edad <= 30) {
-      cat("Grasa corporal óptima = 12-18 %\n")
-    } else if (edad <= 40) {
-      cat("Grasa corporal óptima = 13-19 %\n")
-    } else if (edad <= 50) {
-      cat("Grasa corporal óptima = 14-20 %\n")
-    } else if (edad <= 60) {
-      cat("Grasa corporal óptima = 16-20 %\n")
+  } else if (gender == "Male") {
+    if (age <= 30) {
+      cat("Optimal body fat = 12-18 %\n")
+    } else if (age <= 40) {
+      cat("Optimal body fat = 13-19 %\n")
+    } else if (age <= 50) {
+      cat("Optimal body fat = 14-20 %\n")
+    } else if (age <= 60) {
+      cat("Optimal body fat = 16-20 %\n")
     } else {
-      cat("Grasa corporal óptima = 17-21 %\n")
+      cat("Optimal body fat = 17-21 %\n")
     }
   } else {
-    cat("Género no válido: usa \"Mujer\" o \"Hombre\"\n")
+    cat("Invalid gender: use \"Female\" or \"Male\"\n")
   }
 }
 
-# Variables de un individuo
-edad <- 35
-genero <- "Mujer"
+# Variables of one individual
+age <- 35
+gender <- "Female"
 
-# Mostrar el resultado
-grasa_corporal_optima(edad, genero)
+optimal_body_fat(age, gender)
 ```
 
+Because the conditions are evaluated in order, each branch only needs its upper age limit. The final `else` of each gender block covers everyone above 60, including non-integer ages such as 60.5.
 
-###Ejercicio 3:
-A	partir	del	conjunto	de	datos	anorexia del	paquete	MASS,	calculad	el	porcentaje	de	pacientes	que	han	realizado	cada	tipo	de	tratamiento.
-```{r}
-library(MASS)
+# Exercise 3. Treatment distribution in `anorexia`
+
+> From the `anorexia` data set of the `MASS` package, compute the percentage of patients who received each type of treatment.
+
+```{r exercise-3}
 data("anorexia", package = "MASS")
-tabla_tratamiento <- table(anorexia$Treat)
-porcentaje_tratamiento <- prop.table(tabla_tratamiento)
-round(porcentaje_tratamiento, 2) * 100
+
+treatment_table <- table(anorexia$Treat)
+treatment_percentage <- prop.table(treatment_table)
+
+round(treatment_percentage, 2) * 100
 ```
 
-###Ejercicio 4:
-A	partir	del	conjunto	de	datos	birthwt del	paquete	MASS,	calculad	cuántos	recién	nacidos	con	un	 peso	 inferior	 a	 2.600	 gramos	 corresponden	 a	 madres	 menores	 de	 veinte años y	fumadoras.
-```{r}
+Of the 72 young women, 40% received cognitive behavioural therapy (CBT), 36% were in the control group (Cont) and 24% received family therapy (FT).
+
+# Exercise 4. Low birth weight, young smoking mothers
+
+> From the `birthwt` data set of the `MASS` package, compute how many newborns weighing less than 2,600 grams correspond to mothers younger than twenty who smoke.
+
+```{r exercise-4-dplyr}
 data("birthwt", package = "MASS")
-bebes <- birthwt %>%
+
+# Vectorised approach
+low_weight_infants <- birthwt %>%
   filter(bwt < 2600 & age < 20 & smoke == 1)
-nrow(bebes)
+nrow(low_weight_infants)
 ```
 
-```{r}
-c_inf <- 0
+The same result with an explicit loop over the records:
 
-for(i in 1:nrow(birthwt)) {
+```{r exercise-4-loop}
+infant_count <- 0
+
+for (i in 1:nrow(birthwt)) {
   if (birthwt$bwt[i] < 2600) {
-    if (birthwt$age[i] < 20 ) {
-      if (birthwt$smoke[i] == 1)
-        c_inf <- c_inf + 1
+    if (birthwt$age[i] < 20) {
+      if (birthwt$smoke[i] == 1) {
+        infant_count <- infant_count + 1
+      }
     }
   }
 }
 
-
-#Mostramos el resultado
-print(c_inf)
-
+print(infant_count)
 ```
 
-###Ejercicio 5:
-Supongamos	 que	 queremos	 generar	 un	 registro	 médico	 de	 pacientes	 que	 incluya	
-información	 como	 nombre,	 edad,	 diagnóstico	 y	 niveles	 de	 glucosa	 en	 sangre,	 con los	siguientes	datos	de	pacientes:
-nombres	 <-	 c(«Ana»,	 «Luis»,	 «María»,	 «Carlos»,	 «Elena»)	 
-edades	 <-	 c(45,	 32,	 28,	 55,	 40)	
-diagnósticos	 <-	 c(«Diabetes»,	 «Hipertensión»,	 «Sano»,	 «Hipertensión»,	 «Asma»)	 glucosa	<-	c(125,	140,	95,	160,	110).	
-Definid	una	función	llamada	crear_registro_médico	que	tome	los	cuatro	vectores	anteriores	
-como	 argumentos	 (nombres,	 edades,	 diagnósticos	 y	 glucosa)	 y	 cree	 un	 data	 frame	que	representa	un	registro	médico	de	pacientes.	Finalmente,	el	resultado	por	pantalla	deberá	ser	un	 data	 frame	 que	 contiene	 información	 detallada	 sobre	 cada	 paciente, incluyendo	 su	nombre,	edad,	diagnóstico	y	niveles	de	glucosa	en	sangre.
-```{r}
-#Crear variables
-  nombres <- c("Ana", "Luis",	"Maria", "Carlos", "Elena") 
-  edades <- c(45,	 32,	 28,	 55,	 40)
-  diagnósticos <- c("Diabetes",	 "Hipertension",	 "Sano",	"Hipertension",	"Asma")
-  glucosa <- c(125,	140,	95,	160,	110)
+Both approaches give 7 newborns. Note that the loop must iterate over `nrow(birthwt)`: `length()` of a data frame returns the number of columns, not rows.
 
-#Crear función 
-crear_registro_medico <- function(nombres, edades, diagnosticos, glucosa){
-  registro_medico <- data.frame(
-    Nombre = nombres,
-    Edad = edades,
-    Diagnóstico = diagnosticos,
-    Glucosa = glucosa,
+# Exercise 5. Medical record constructor
+
+> Suppose we want to generate a medical record of patients with name, age, diagnosis and blood glucose level, using the data below. Define a function called `create_medical_record` that takes the four vectors as arguments (names, ages, diagnoses and glucose) and creates a data frame representing the patient medical record. The output must be a data frame with detailed information about each patient.
+
+```{r exercise-5}
+patient_names <- c("Ana", "Luis", "Maria", "Carlos", "Elena")
+ages          <- c(45, 32, 28, 55, 40)
+diagnoses     <- c("Diabetes", "Hypertension", "Healthy", "Hypertension", "Asthma")
+glucose       <- c(125, 140, 95, 160, 110)
+
+#' Build a medical record data frame
+#'
+#' @param patient_names Character vector with the patient names.
+#' @param ages Numeric vector with the patient ages (years).
+#' @param diagnoses Character vector with the diagnoses.
+#' @param glucose Numeric vector with blood glucose levels (mg/dl).
+#' @return A data frame with one row per patient and the columns
+#'   Name, Age, Diagnosis and Glucose.
+create_medical_record <- function(patient_names, ages, diagnoses, glucose) {
+  medical_record <- data.frame(
+    Name      = patient_names,
+    Age       = ages,
+    Diagnosis = diagnoses,
+    Glucose   = glucose
   )
-  return(registro_medico)
+  return(medical_record)
 }
 
-#Mostrar el registro médico
-print(registro_medico)
+medical_record <- create_medical_record(patient_names, ages, diagnoses, glucose)
+print(medical_record)
 ```
 
-###Ejercicio 6:
-A	partir	del	conjunto	de	datos	birthwt del	paquete	MASS,	guardad	en	un	vector	los	pesos	de	los	recién	nacidos	cuyas	madres	tengan	menos	de	20	años.	Calculad	la	media	y	representad	gráficamente	este	vector	(por	ejemplo,	un	diagrama	de	puntos).	
-```{r}
-pesos_bebes <- c()
+# Exercise 6. Birth weights of babies born to young mothers
+
+> From the `birthwt` data set, store in a vector the weights of the newborns whose mothers are younger than 20 years. Compute the mean and plot this vector (for example, a dot plot).
+
+```{r exercise-6}
+young_mothers_weights <- c()
 j <- 1
 
-#Crear bucle para guardar los pesos
-for(i in 1:nrow(birthwt)) {
-  if(birthwt$age[i] < 20){
-    pesos_bebes[j] <- birthwt$bwt[i]
+# Loop that stores the weights
+for (i in 1:nrow(birthwt)) {
+  if (birthwt$age[i] < 20) {
+    young_mothers_weights[j] <- birthwt$bwt[i]
     j <- j + 1
   }
 }
 
-#Calcular la media
-mean(pesos_bebes)
+# Mean birth weight
+mean(young_mothers_weights)
 
-#Crear gráfica
-plot(pesos_bebes)
+# Dot plot
+plot(young_mothers_weights,
+     xlab = "Newborn (order in the data set)",
+     ylab = "Birth weight (g)",
+     main = "Birth weight of babies born to mothers under 20")
 ```
 
-###Ejercicio 7:
-Si	 consideramos	 el	 conjunto	 de	 datos	 birthwt del	 paquete	 MASS,	 cread	 una	 función	 que	muestre	los	valores	de	peso	de	los	recién	nacidos	cuyas	madres	sean	de	raza	blanca	y	cuyo	peso	esté	por	debajo	de	la	media	de	los	pesos	observados.	
-```{r}
-calcular_peso <- function(datos){
-  valores_peso <- datos %>%
+# Exercise 7. White mothers and below-average birth weight
+
+> From the `birthwt` data set, create a function that shows the weights of the newborns whose mothers are white and whose weight is below the mean of the observed weights.
+
+```{r exercise-7}
+#' Birth weights below the sample mean for babies of white mothers
+#'
+#' Both conditions are evaluated in a single filter, so the mean is computed
+#' over all newborns (as the statement requires) and not only over white mothers.
+#'
+#' @param data A data frame with the columns `race` (1 = white) and `bwt` (grams).
+#' @return A numeric vector with the selected birth weights.
+low_weights_white_mothers <- function(data) {
+  weights <- data %>%
     filter(race == 1 & bwt < mean(bwt)) %>%
     pull(bwt)
-  return(valores_peso)
+  return(weights)
 }
 
-calcular_peso(birthwt)
+low_weights_white_mothers(birthwt)
 ```
 
+The function returns 39 weights. Filtering by race first and then by the mean would have computed the mean over white mothers only, giving a different result (52 values).
 
-###Ejercicio 8:
-A	partir	del	conjunto	de	datos	Melanoma	del	paquete	MASS que	hace	referencia	a	los	datos	
-de	supervivencia	de	melanoma	maligno,	se	pide	resolver	las	siguientes	cuestiones:	
-a)	Definid	un	vector	que	guarde	las	edades	de	los	individuos	observados	y	calculad	la	media,	el	máximo	y	el	mínimo	de	esta	distribución.	
-```{r}
-data("Melanoma")
+# Exercise 8. Melanoma survival data
 
-#Crear vector
-edades <- c()
-j <- 1
+> From the `Melanoma` data set of the `MASS` package (survival data of malignant melanoma), solve the following questions.
 
-#Crear bucle
-for(i in 1:nrow(Melanoma)){
-  edades[j] <- Melanoma[i,4]
-  j <- j +1 
+## 8a. Ages
+
+> Define a vector that stores the ages of the observed individuals and compute the mean, maximum and minimum of this distribution.
+
+```{r exercise-8a}
+data("Melanoma", package = "MASS")
+
+ages <- c()
+
+for (i in 1:nrow(Melanoma)) {
+  ages[i] <- Melanoma$age[i]
 }
 
-#Calcular media, máximo y mínimo
-cat("Edad máxima = ", max(edades), "\n")
-cat("Edad mínima = ", min(edades), "\n")
-cat("Edad media = ", mean(edades), "\n")
-  
+cat("Maximum age = ", max(ages), "\n")
+cat("Minimum age = ", min(ages), "\n")
+cat("Mean age    = ", mean(ages), "\n")
 ```
 
-b)	Definid	una	función	que	recorra	el	conjunto	de	datos	y	muestre	 cuántos	 de	 los	 individuos	 observados	 murieron	 a	 causa del	 melanoma,	 cuántos sobrevivieron	y	cuántos	murieron	por	diferentes	causas.	
-```{r}
+## 8b. Outcomes
 
-calcular_muertes <- function(datos) {
-  muertes <- 0
-  supervivientes <- 0
-  otras_causas <- 0
-  for (i in 1:nrow(datos)) {
-    if (datos$status[i] == 1) {
-      muertes <- muertes + 1
-    } else if (datos$status[i] == 2) {
-      supervivientes <- supervivientes + 1
-    } else if (datos$status[i] == 3) {
-      otras_causas <- otras_causas + 1
+> Define a function that traverses the data set and shows how many individuals died from melanoma, how many survived and how many died from other causes.
+
+```{r exercise-8b}
+#' Count the outcomes of the Melanoma data set
+#'
+#' @param data A data frame with a `status` column coded as
+#'   1 = died from melanoma, 2 = alive, 3 = died from other causes.
+#' @return A named numeric vector with the three counts.
+count_melanoma_outcomes <- function(data) {
+  melanoma_deaths <- 0
+  survivors <- 0
+  other_causes <- 0
+
+  for (i in 1:nrow(data)) {
+    if (data$status[i] == 1) {
+      melanoma_deaths <- melanoma_deaths + 1
+    } else if (data$status[i] == 2) {
+      survivors <- survivors + 1
+    } else if (data$status[i] == 3) {
+      other_causes <- other_causes + 1
     }
   }
+
   return(c(
-    melanoma = muertes,
-    supervivientes = supervivientes,
-    otras = otras_causas
+    melanoma_deaths = melanoma_deaths,
+    survivors       = survivors,
+    other_causes    = other_causes
   ))
 }
 
-calcular_muertes(Melanoma)
-
+count_melanoma_outcomes(Melanoma)
 ```
 
-c)	Definid	una	función	que	recorra	el	conjunto	de	datos	y	muestre	la	proporción	de	hombres	y	de	mujeres	que	murieron	por	melanoma
+Of the 205 patients, 57 died from melanoma, 134 survived and 14 died from other causes.
 
-```{r}
-calcular_genero_melanoma <- function(datos){
-  hombres <- 0
-  mujeres <- 0
-  muertes <- 0
-  for(i in 1:nrow(datos)){
-    if (datos$status[i] == 1){
-      muertes <- muertes +1
-      if (datos$sex[i] == 1){
-      hombres <- hombres + 1
+## 8c. Sex distribution of melanoma deaths
+
+> Define a function that traverses the data set and shows the proportion of men and women who died from melanoma.
+
+```{r exercise-8c}
+#' Proportion of men and women among melanoma deaths
+#'
+#' @param data A data frame with `status` (1 = died from melanoma) and
+#'   `sex` (1 = male, 0 = female).
+#' @return A named numeric vector with the proportion of men and women.
+melanoma_deaths_by_sex <- function(data) {
+  men <- 0
+  women <- 0
+  deaths <- 0
+
+  for (i in 1:nrow(data)) {
+    if (data$status[i] == 1) {
+      deaths <- deaths + 1
+      if (data$sex[i] == 1) {
+        men <- men + 1
+      } else {
+        women <- women + 1
+      }
+    }
+  }
+
+  # Proportions are computed once, after the loop has counted every record
+  return(c(
+    proportion_men   = men / deaths,
+    proportion_women = women / deaths
+  ))
+}
+
+melanoma_deaths_by_sex(Melanoma)
+```
+
+Among the 57 melanoma deaths, 29 were men (50.9%) and 28 were women (49.1%): the two sexes are almost equally represented.
+
+# Exercise 9. SQL queries on `airquality`
+
+> From the `airquality` data set, solve the following queries.
+
+**1) Show the mean of Ozone.**
+
+```{r exercise-9-1}
+data("airquality")
+sqldf("SELECT AVG(Ozone) FROM airquality")
+```
+
+`AVG()` ignores `NULL` values, so the missing ozone measurements are excluded automatically.
+
+**2) Show Ozone, Solar.R and Wind for months 5, 6 and 7.**
+
+```{r exercise-9-2}
+sqldf("SELECT Ozone, [Solar.R], Wind FROM airquality WHERE Month IN (5, 6, 7)")
+```
+
+**3) Show the previous information ordered by Month.**
+
+```{r exercise-9-3}
+sqldf("SELECT Month, Ozone, [Solar.R], Wind FROM airquality
+       WHERE Month IN (5, 6, 7) ORDER BY Month")
+```
+
+**4) Show Wind grouped by Month, displaying only the first five records.**
+
+```{r exercise-9-4}
+sqldf("SELECT Wind, Month FROM airquality GROUP BY Month LIMIT 5")
+```
+
+`GROUP BY Month` returns one row per month. Since `Wind` is not aggregated, SQLite shows an arbitrary value of each group; to summarise it meaningfully one would use an aggregate such as `AVG(Wind)`.
+
+# Case Study 1. The Fibonacci series in DNA molecules
+
+> According to Mark E. Curtis, each complete turn of the DNA double helix measures 21 Å wide by 34 Å long; 34 and 21 are two consecutive numbers of the Fibonacci sequence. Their quotient, 1.6190476, closely approximates the golden ratio φ = 1.6180339...
+
+## a) Fibonacci series
+
+> Implement a function that, given a value n, shows the values of the Fibonacci series up to that value.
+
+```{r fibonacci-series}
+#' Generate the first n terms of the Fibonacci series
+#'
+#' Each term is the sum of the two previous ones, starting at 0 and 1.
+#'
+#' @param n Integer. Number of terms to generate.
+#' @return A numeric vector with the first n terms.
+fibonacci_series <- function(n) {
+  terms <- c(0, 1)
+
+  # For n <= 2 the first terms are already available
+  if (n <= 2) {
+    return(terms[1:n])
+  }
+
+  for (i in 2:(n - 1)) {
+    terms[i + 1] <- terms[i] + terms[i - 1]
+  }
+  return(terms)
+}
+
+fibonacci_series(5)
+```
+
+## b) Where are the DNA measurements in the series?
+
+> For which values of n do we find the measurements of the DNA double helix in the Fibonacci series?
+
+```{r fibonacci-dna}
+fibonacci_series(9)
+fibonacci_series(10)
+```
+
+The width of the helix (21 Å) is the 9th term of the series and the length (34 Å) is the 10th, so both appear when n = 10.
+
+## c) Successive ratios
+
+> Extend the code so that, for a given n, it shows the successive ratios of the Fibonacci terms. From which value of n does this ratio approach the golden ratio?
+
+```{r fibonacci-ratios}
+#' Fibonacci terms together with the ratio to the previous term
+#'
+#' @param n Integer. Number of terms (at least 3).
+#' @return A data frame with the Fibonacci terms and the ratio of each term to
+#'   the previous one. The first two rows have no ratio (`NA`).
+fibonacci_ratios <- function(n) {
+  terms <- c(0, 1)
+  ratios <- c()
+
+  for (i in 2:(n - 1)) {
+    terms[i + 1] <- terms[i] + terms[i - 1]
+    ratios[i + 1] <- terms[i + 1] / terms[i]
+  }
+  return(data.frame(term = terms, ratio = ratios))
+}
+
+# 15 terms are enough to see the convergence
+fibonacci_ratios(15)
+
+# Golden ratio for reference
+(1 + sqrt(5)) / 2
+```
+
+The first row with a defined ratio is 1/1; the ratio then oscillates around the golden ratio with a decreasing amplitude. The error with respect to φ = 1.618034 is below 0.01 from n = 8 (13/8 = 1.625) and below 0.001 from n = 11 (55/34 = 1.6176). The helix ratio itself, 34/21 = 1.6190 (n = 10), is already within 0.001 of φ.
+
+# Case Study 2. DNA sequences
+
+> Generate a DNA sequence and compute its reverse and its complementary strand.
+
+```{r dna-sequences}
+#' Generate a random DNA sequence
+#'
+#' @param n Integer. Length of the sequence.
+#' @return A character string made of the bases A, C, G and T.
+generate_sequence <- function(n) {
+  bases <- c("C", "A", "T", "G")
+  sequence <- sample(bases, n, replace = TRUE)
+  return(paste(sequence, collapse = ""))
+}
+
+#' Reverse a DNA sequence
+#'
+#' @param sequence Character string with the DNA sequence.
+#' @return The sequence read from the last base to the first.
+reverse_sequence <- function(sequence) {
+  reversed <- rev(strsplit(sequence, "")[[1]])
+  return(paste(reversed, collapse = ""))
+}
+
+#' Complementary strand of a DNA sequence
+#'
+#' Pairs each base with its Watson-Crick partner (A-T, G-C), keeping the
+#' original order.
+#'
+#' @param sequence Character string with the DNA sequence.
+#' @return A character string with the complementary bases.
+complementary_sequence <- function(sequence) {
+  bases <- strsplit(sequence, "")[[1]]
+  complement <- c()
+
+  for (i in 1:length(bases)) {
+    if (bases[i] == "A") {
+      complement[i] <- "T"
+    } else if (bases[i] == "T") {
+      complement[i] <- "A"
+    } else if (bases[i] == "G") {
+      complement[i] <- "C"
     } else {
-      mujeres <- mujeres +1
-    }
+      complement[i] <- "G"
     }
   }
-   prop_m <- mujeres/muertes
-   prop_h <- hombres/muertes
-   
-  return(c(
-    proporcion_hombres = prop_h,
-    proporcion_mujeres = prop_m
-  ))
+  return(paste(complement, collapse = ""))
 }
 
+set.seed(123)  # reproducible random sequence
 
-calcular_genero_melanoma(Melanoma)
+original_sequence <- generate_sequence(20)
+reversed_sequence <- reverse_sequence(original_sequence)
+complement_sequence <- complementary_sequence(original_sequence)
 
+cat("Original sequence:      ", original_sequence, "\n")
+cat("Reversed sequence:      ", reversed_sequence, "\n")
+cat("Complementary sequence: ", complement_sequence, "\n")
 ```
 
+# Case Study 3. Hospital patient database
+
+> Suppose we want to manage the information of a hospital patient database with two tables, `patients` (name, age, gender, medical_condition) and `medical_records` (patient_id, date, glucose_level), with the records given in the statement. Use database access instructions to solve the following questions.
+
+## 1) Create the database, tables and connection
+
+```{r database-setup}
+# SQLite file database; extended_types keeps R dates as dates
+con <- dbConnect(SQLite(), "hospital.db", extended_types = TRUE)
+
+patients <- data.frame(
+  patient_id        = 1:5,
+  name              = c("Patient1", "Patient2", "Patient3", "Patient4", "Patient5"),
+  age               = c(45, 32, 28, 55, 40),
+  gender            = c("Female", "Male", "Female", "Male", "Female"),
+  medical_condition = c("Diabetes", "Hypertension", "Healthy", "Hypertension", "Asthma")
+)
+dbWriteTable(con, "patients", patients, row.names = FALSE, overwrite = TRUE)
+
+medical_records <- data.frame(
+  patient_id    = 1:5,
+  date          = as.Date("2023-08-01"),
+  glucose_level = c(125.5, 140.2, 95.8, 160.6, 110.9)
+)
+dbWriteTable(con, "medical_records", medical_records, row.names = FALSE, overwrite = TRUE)
+
+dbListTables(con)
+```
+
+The `patient_id` column is the key that links both tables: it is added to `patients` because the records refer to patients by their order (1 to 5).
+
+## 2) Patients with a specific medical condition
+
+```{r query-diabetes}
+dbGetQuery(con, "SELECT * FROM patients WHERE medical_condition = 'Diabetes'")
+```
+
+## 3) Descriptive statistics of blood glucose
+
+```{r query-glucose-stats}
+glucose_levels <- dbGetQuery(con, "SELECT glucose_level FROM medical_records")$glucose_level
+
+cat("Mean               =", mean(glucose_levels), "\n")
+cat("Median             =", median(glucose_levels), "\n")
+cat("Standard deviation =", sd(glucose_levels), "\n")
+cat("Minimum            =", min(glucose_levels), "\n")
+cat("Maximum            =", max(glucose_levels), "\n")
+```
+
+## 4) Medical records of patients with hypertension and their glucose statistics
+
+```{r query-hypertension}
+hypertension_records <- dbGetQuery(con, "
+  SELECT p.name, r.date, r.glucose_level
+  FROM patients p
+  JOIN medical_records r ON p.patient_id = r.patient_id
+  WHERE p.medical_condition = 'Hypertension'")
+hypertension_records
+
+dbGetQuery(con, "
+  SELECT AVG(r.glucose_level) AS mean_glucose,
+         MAX(r.glucose_level) AS max_glucose,
+         MIN(r.glucose_level) AS min_glucose
+  FROM patients p
+  JOIN medical_records r ON p.patient_id = r.patient_id
+  WHERE p.medical_condition = 'Hypertension'")
+```
+
+Joining on `patient_id` links each record to the right patient regardless of row order, which makes it safer than binding the two tables column-wise.
+
+## 5) Mean age of asthma patients by gender
+
+```{r query-asthma-age}
+dbGetQuery(con, "
+  SELECT gender, AVG(age) AS mean_age
+  FROM patients
+  WHERE medical_condition = 'Asthma'
+  GROUP BY gender")
+```
+
+Only one patient has asthma (a 40-year-old woman), so the mean age equals her age and no male group appears.
+
+## 6) Gender distribution of patients with diabetes
+
+```{r plot-diabetes-gender}
+diabetes_gender <- dbGetQuery(con, "SELECT * FROM patients WHERE medical_condition = 'Diabetes'")
+
+ggplot(diabetes_gender, aes(x = gender)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Gender of patients with diabetes",
+       x = "Gender", y = "Number of patients")
+
+dbDisconnect(con)
+```
+
+`geom_bar()` counts the rows of each category by itself; with a single diabetic patient the chart shows one bar (Female).
+
+# Session information
+
+```{r session-info}
+sessionInfo()
+```
