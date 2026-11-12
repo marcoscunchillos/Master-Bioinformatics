@@ -1,4 +1,4 @@
-# Module 03: Software for Data Analysis
+# Module 02: Software for Data Analysis
 
 <div align="left">
 
