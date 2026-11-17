@@ -1,0 +1,549 @@
+---
+title: "Practice 04: Probability Distributions and Simulation in R"
+author: "Marcos Cunchillos Just"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
+```
+
+## Overview
+
+This practice applies the `d`/`p`/`q`/`r` family of R functions to the main
+discrete and continuous probability distributions (binomial, Poisson, normal),
+combinatorics with `gtools`, random sampling, and a distribution-fitting case
+study on the Old Faithful geyser dataset.
+
+| Prefix | Meaning | Example |
+|:------:|:--------|:--------|
+| `d` | Density / probability mass: $P(X = x)$ | `dbinom(3, 10, 0.5)` |
+| `p` | Cumulative probability: $P(X \le x)$ | `pbinom(3, 10, 0.5)` |
+| `q` | Quantile (inverse of `p`) | `qnorm(0.975)` |
+| `r` | Random number generation | `rnorm(100)` |
+
+```{r packages, message=FALSE}
+library(gtools)
+```
+
+---
+
+## Exercise 1: Binomial distribution (clinical trial)
+
+In a clinical trial, a sample of 100 patients is taken. The probability that a
+patient suffers from a cardiovascular disease is 0.45. Compute:
+
+```{r ex1-parameters}
+n_patients <- 100
+p_disease  <- 0.45
+```
+
+**a)** The probability that exactly 30 patients have the disease: $P(X = 30)$.
+
+```{r ex1a}
+dbinom(30, size = n_patients, prob = p_disease)
+```
+
+**b)** The probability that **at least** 15 patients have the disease:
+$P(X \ge 15)$. Is this result surprising?
+
+For a discrete variable, $P(X \ge 15) = 1 - P(X \le 14)$, so the upper limit
+passed to `pbinom()` must be **14**, not 15.
+
+```{r ex1b}
+pbinom(14, size = n_patients, prob = p_disease, lower.tail = FALSE)
+```
+
+The probability is practically 1. This is expected: with 100 patients and
+$p = 0.45$ the expected number of cases is $np = 45$, so having fewer than 15
+cases would be an extremely unlikely event.
+
+**c)** The probability that **between 5 and 10 patients (both inclusive)** have
+the disease: $P(5 \le X \le 10)$.
+
+For discrete variables: $P(a \le X \le b) = F(b) - F(a - 1)$.
+
+```{r ex1c}
+pbinom(10, n_patients, p_disease) - pbinom(4, n_patients, p_disease)
+```
+
+---
+
+## Exercise 2: Binomial simulation and Poisson distribution
+
+**a)** Generate 500 observations from a binomial distribution $B(1, 0.5)$ and
+store them in a vector called `bino`. Compute the absolute and relative
+frequencies. What do you observe?
+
+```{r ex2a}
+set.seed(123)
+bino <- rbinom(n = 500, size = 1, prob = 0.5)
+
+abs_freq <- table(bino)
+rel_freq <- prop.table(abs_freq)
+
+abs_freq
+rel_freq
+```
+
+Both outcomes appear with a frequency close to 0.5, as expected for a fair
+Bernoulli trial. The small deviation from exactly 250/250 is sampling
+variability, and it shrinks as the sample size grows (law of large numbers).
+
+**b)** On average, 12 individuals per minute cross a street. Compute the
+probability that **18 or more** individuals cross in any given minute:
+$P(X \ge 18)$.
+
+```{r ex2b}
+ppois(17, lambda = 12, lower.tail = FALSE)
+```
+
+---
+
+## Exercise 3: Poisson distribution (drug factory)
+
+A factory produces headache drugs at a rate that follows a Poisson distribution
+with $\lambda = 0.5$ drugs per minute. Compute:
+
+**a)** The probability that exactly one drug is produced in a random minute.
+
+```{r ex3a}
+lambda_min <- 0.5
+dpois(1, lambda = lambda_min)
+```
+
+**b)** The probability that **at most** 3 drugs are produced in a random minute.
+
+```{r ex3b}
+ppois(3, lambda = lambda_min)
+```
+
+**c)** The probability that 4 drugs are produced in 8 minutes.
+
+The Poisson parameter scales with the length of the interval:
+$\lambda_{8\,min} = 0.5 \times 8 = 4$.
+
+```{r ex3c}
+lambda_8min <- lambda_min * 8
+dpois(4, lambda = lambda_8min)
+```
+
+---
+
+## Exercise 4: Sampling from an urn
+
+An urn contains 40 balls: 25 yellow and 15 green. Yellow balls are coded as 1
+and green balls as 0.
+
+**a)** Probability of drawing each type of ball.
+
+```{r ex4a}
+n_total  <- 40
+n_yellow <- 25
+n_green  <- n_total - n_yellow
+
+prob_yellow <- n_yellow / n_total
+prob_green  <- n_green / n_total
+
+c(green = prob_green, yellow = prob_yellow)
+```
+
+**b)** Simulate the draw of one ball.
+
+```{r ex4b}
+set.seed(123)
+sample(c(0, 1), size = 1, prob = c(prob_green, prob_yellow))
+```
+
+**c)** Simulate 9 draws **with replacement**.
+
+```{r ex4c}
+sample(c(0, 1), size = 9, replace = TRUE, prob = c(prob_green, prob_yellow))
+```
+
+---
+
+## Exercise 5: Binomial and normal distributions
+
+**a)** Probability of obtaining exactly four heads in six tosses of a fair coin.
+
+```{r ex5a}
+dbinom(4, size = 6, prob = 0.5)
+```
+
+**b)** Probability of obtaining **at most** four heads in six tosses.
+
+```{r ex5b}
+pbinom(4, size = 6, prob = 0.5)
+```
+
+**c)** Generate 10 pseudo-random values from $X \sim B(6, 0.5)$.
+
+```{r ex5c}
+set.seed(123)
+rbinom(10, size = 6, prob = 0.5)
+```
+
+**d)** Generate a sample of size 10,000 from a normal distribution $N(3, 2)$
+and plot a histogram with coloured bars.
+
+Following R's convention, the second parameter is the standard deviation.
+
+```{r ex5d}
+set.seed(123)
+normal_sample <- rnorm(10000, mean = 3, sd = 2)
+
+hist(normal_sample,
+     breaks = 40,
+     col    = "steelblue",
+     border = "white",
+     main   = "Sample from N(3, 2), n = 10,000",
+     xlab   = "x")
+```
+
+**e)** Check whether the sum of two independent normal variables
+$X_1 \sim N(6, 0.5)$ and $X_2 \sim N(3, 0.6)$ is also normal.
+
+Theory: the sum of independent normal variables is normal, with
+$\mu = \mu_1 + \mu_2 = 9$ and
+$\sigma^2 = \sigma_1^2 + \sigma_2^2$, that is
+$\sigma = \sqrt{0.5^2 + 0.6^2} \approx 0.781$.
+
+```{r ex5e}
+set.seed(123)
+x1 <- rnorm(1000, mean = 6, sd = 0.5)
+x2 <- rnorm(1000, mean = 3, sd = 0.6)
+x_sum <- x1 + x2
+
+hist(x_sum,
+     breaks = 30,
+     prob   = TRUE,
+     col    = "steelblue",
+     border = "white",
+     main   = "Sum of two independent normal variables",
+     xlab   = "x1 + x2")
+
+# Overlay the theoretical normal density
+curve(dnorm(x, mean = 9, sd = sqrt(0.5^2 + 0.6^2)),
+      add = TRUE, col = "red", lwd = 2)
+
+# Empirical vs theoretical parameters, and a formal normality test
+c(empirical_mean = mean(x_sum), theoretical_mean = 9)
+c(empirical_sd = sd(x_sum), theoretical_sd = sqrt(0.5^2 + 0.6^2))
+shapiro.test(x_sum)
+```
+
+The histogram follows the theoretical density, and the Shapiro-Wilk test does
+not reject normality ($H_0$: the data are normal), which confirms the result.
+
+---
+
+## Exercise 6: Dice game simulation
+
+A game consists of rolling a die 5 times per round. We simulate 8 rounds and
+identify the **winning rounds**: those with at least one 6.
+
+```{r ex6}
+set.seed(123)
+
+# Each column is one round (5 rolls)
+rounds <- replicate(8, sample(1:6, size = 5, replace = TRUE))
+colnames(rounds) <- paste("Round", 1:8)
+rounds
+
+# A round is winning if any of its rolls is a 6
+winning_rounds <- apply(rounds == 6, MARGIN = 2, FUN = any)
+winning_rounds
+
+sum(winning_rounds)
+```
+
+Theoretical check: the probability of at least one 6 in 5 rolls is
+$1 - (5/6)^5 \approx 0.598$, so about 5 winning rounds out of 8 are expected.
+
+```{r ex6-theory}
+1 - (5 / 6)^5
+```
+
+---
+
+## Exercise 7: Combinatorics with `gtools`
+
+A bowl contains three types of apples (golden, fuji, gala).
+
+**a)** How many permutations of 2 apples are there (with repetition)?
+
+Theory: $3^2 = 9$ ordered pairs (the statement writes "32", which is a typo
+for the power $3^2$).
+
+```{r ex7a}
+apples <- c("golden", "fuji", "gala")
+
+permutations(n = 3, r = 2, v = apples, repeats.allowed = TRUE)
+nrow(permutations(3, 2, apples, repeats.allowed = TRUE))
+```
+
+**b)** How many combinations (with repetition, order does not matter)?
+
+```{r ex7b}
+combinations(n = 3, r = 2, v = apples, repeats.allowed = TRUE)
+nrow(combinations(3, 2, apples, repeats.allowed = TRUE))
+```
+
+**c)** How many codons (triplets) have **all their nucleotides different**?
+The nucleotides are A, T, G and C.
+
+Each nucleotide can be used only once, so repetition must **not** be allowed:
+$4 \times 3 \times 2 = 24$. (With `repeats.allowed = TRUE` the result would be
+$4^3 = 64$, which counts *all* possible codons, not only those with distinct
+nucleotides.)
+
+```{r ex7c}
+nucleotides <- c("A", "T", "G", "C")
+
+distinct_codons <- permutations(n = 4, r = 3, v = nucleotides,
+                                repeats.allowed = FALSE)
+nrow(distinct_codons)
+```
+
+---
+
+## Exercise 8: Normal distribution $N(20, 9)$
+
+Given $X \sim N(\mu, \sigma^2) = N(20, 9)$. The statement uses the
+$N(\mu, \sigma^2)$ notation, so the **variance is 9** and the standard
+deviation is $\sigma = 3$. R's functions use the standard deviation.
+
+```{r ex8-parameters}
+mu    <- 20
+sigma <- sqrt(9)
+```
+
+**a)** Quartiles (0.25, 0.5, 0.75).
+
+```{r ex8a}
+qnorm(c(0.25, 0.5, 0.75), mean = mu, sd = sigma)
+```
+
+**b)** $P(X \ge 8)$. For a continuous variable, $P(X \ge 8) = P(X > 8)$.
+
+```{r ex8b}
+pnorm(8, mean = mu, sd = sigma, lower.tail = FALSE)
+```
+
+**c)** Plot the density function.
+
+```{r ex8c}
+x <- seq(mu - 4 * sigma, mu + 4 * sigma, length.out = 1000)
+
+plot(x, dnorm(x, mean = mu, sd = sigma),
+     type = "l", lwd = 2, col = "purple",
+     xlab = "x", ylab = "Density",
+     main = "Normal distribution: mean = 20, standard deviation = 3")
+```
+
+---
+
+## Exercise 9: Sampling from `ChickWeight`
+
+Using the `ChickWeight` dataset, obtain a statistical summary of `weight`, draw
+a random sample of 30 records called `my_sample`, store it in a new data frame
+and check whether the sample's `weight` distribution is similar to the
+original one.
+
+```{r ex9-population}
+data("ChickWeight")
+
+summary(ChickWeight$weight)
+```
+
+```{r ex9-sample}
+set.seed(969)
+sample_rows <- sample(nrow(ChickWeight), size = 30)
+my_sample   <- as.data.frame(ChickWeight[sample_rows, ])
+
+summary(my_sample$weight)
+```
+
+To compare both distributions, we place the summaries side by side and plot
+them on the same scale.
+
+```{r ex9-compare}
+rbind(population = summary(ChickWeight$weight),
+      sample     = summary(my_sample$weight))
+
+boxplot(list(Population = ChickWeight$weight, Sample = my_sample$weight),
+        col  = c("grey80", "steelblue"),
+        main = "Chick weight: population vs random sample",
+        ylab = "Weight (g)")
+```
+
+The sample reproduces the main features of the population (centre, spread and
+right skew), although with only 30 records the quartiles and extremes vary.
+A larger sample would match the population more closely.
+
+---
+
+## Exercise 10: Applied problems
+
+**a)** A drug reduces the effects of pollen allergy; it has been ineffective in
+only 4% of cases. What type of distribution is this? What is the probability
+that, if the treatment is applied 100 times, there are **more than 5**
+ineffective cases?
+
+This is a **binomial** distribution: we count the number of "successes"
+(ineffective cases) in a fixed number of independent Bernoulli trials (each
+application is either effective or not), with a constant probability
+$p = 0.04$.
+
+```{r ex10a}
+pbinom(5, size = 100, prob = 0.04, lower.tail = FALSE)
+```
+
+**b)** The mean recovery time from a common flu is $7 \pm 2$ days (mean and
+standard deviation). Assuming a normal distribution, compute the probability
+that recovery lasts **between 6 and 10 days**.
+
+```{r ex10b}
+pnorm(10, mean = 7, sd = 2) - pnorm(6, mean = 7, sd = 2)
+```
+
+---
+
+## Cumulative case study: Old Faithful geyser
+
+We study the distribution of the one-dimensional variable `eruptions` from the
+`faithful` dataset (built into R's `datasets` package). It contains the waiting
+time between eruptions (`waiting`, minutes) and the eruption duration
+(`eruptions`, minutes) of the Old Faithful geyser in Yellowstone National Park,
+Wyoming, USA.
+
+**a)** Descriptive statistics of `eruptions`.
+
+```{r faithful-a}
+data("faithful")
+
+summary(faithful$eruptions)
+c(sd = sd(faithful$eruptions), IQR = IQR(faithful$eruptions))
+```
+
+The mean (3.49) is lower than the median (4.00), which suggests a skewed
+distribution. The standard deviation (1.14) and the IQR (2.29) are large
+compared with the mean, so the data are widely spread.
+
+**b)** Stem-and-leaf plot.
+
+```{r faithful-b}
+stem(faithful$eruptions)
+```
+
+Two groups of values are visible: one around 2 minutes and another around
+4 to 4.5 minutes.
+
+**c)** Histogram with smaller intervals and the density estimate superimposed.
+
+```{r faithful-c}
+hist(faithful$eruptions,
+     breaks = seq(1.6, 5.2, by = 0.2),
+     prob   = TRUE,
+     col    = "steelblue",
+     border = "white",
+     main   = "Old Faithful: eruption duration",
+     xlab   = "Eruption duration (min)",
+     ylab   = "Density")
+lines(density(faithful$eruptions, bw = 0.1), col = "red", lwd = 2)
+rug(faithful$eruptions)
+```
+
+**d)** Empirical cumulative distribution function (ECDF), using `ecdf()` from
+the `stats` package.
+
+```{r faithful-d}
+plot(ecdf(faithful$eruptions),
+     do.points = FALSE, verticals = TRUE,
+     main = "ECDF of eruption duration",
+     xlab = "Eruption duration (min)",
+     ylab = "Fn(x)")
+```
+
+**e)** Does this distribution correspond to any standard distribution?
+
+No. The histogram has **two modes** (bimodal), while the normal distribution
+has a single one. A Shapiro-Wilk test confirms it:
+
+```{r faithful-e}
+shapiro.test(faithful$eruptions)
+```
+
+The p-value is far below 0.05, so normality is rejected. The data look like a
+**mixture of two populations**: short eruptions and long eruptions.
+
+```{r faithful-e-groups}
+table(duration = ifelse(faithful$eruptions > 3, "long (> 3 min)", "short (<= 3 min)"))
+```
+
+**f)** Select the eruptions lasting **more than 3 minutes**. What can we say
+about these data?
+
+The filter must use `eruptions` (duration), not `waiting` (time between
+eruptions).
+
+```{r faithful-f}
+long_eruptions <- subset(faithful, eruptions > 3)
+
+nrow(long_eruptions)
+summary(long_eruptions$eruptions)
+sd(long_eruptions$eruptions)
+```
+
+Mean (4.29) and median (4.33) are almost identical and the second mode has
+disappeared, so the long eruptions are **symmetric and unimodal**.
+
+**g)** Plot the ECDF of these data and superimpose the cumulative distribution
+of a normal with the same mean and standard deviation.
+
+```{r faithful-g}
+long_mean <- mean(long_eruptions$eruptions)
+long_sd   <- sd(long_eruptions$eruptions)
+
+plot(ecdf(long_eruptions$eruptions),
+     do.points = FALSE, verticals = TRUE,
+     main = "Long eruptions: empirical vs normal CDF",
+     xlab = "Eruption duration (min)",
+     ylab = "Cumulative probability")
+
+x <- seq(3, 5.4, by = 0.01)
+lines(x, pnorm(x, mean = long_mean, sd = long_sd), lty = 3, col = "red", lwd = 2)
+
+legend("topleft",
+       legend = c("Empirical (ECDF)", "Normal (same mean and SD)"),
+       lty = c(1, 3), col = c("black", "red"), lwd = c(1, 2), bty = "n")
+```
+
+**h)** Do these data resemble any distribution?
+
+The two curves are very close. We complement the visual check with formal tests
+against the normal distribution:
+
+```{r faithful-h, warning=FALSE}
+ks.test(long_eruptions$eruptions, "pnorm", mean = long_mean, sd = long_sd)
+shapiro.test(long_eruptions$eruptions)
+```
+
+The Kolmogorov-Smirnov test does not reject the normal model. The Shapiro-Wilk
+test is stricter and gives a small p-value, but with 175 observations it
+detects even tiny departures from normality. Overall, the long eruptions are
+**well approximated by a normal distribution** with mean 4.29 and standard
+deviation 0.41. Separating the two groups explains the bimodal shape of the
+full dataset: it is a mixture of a short-eruption group and an approximately
+normal long-eruption group.
+
+*Note:* the KS p-value is only approximate here: the data contain tied values
+(durations are recorded with limited precision) and the normal parameters were
+estimated from the same sample. Treat it as supporting evidence, together with
+the ECDF plot, rather than as an exact test.

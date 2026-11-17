@@ -9,7 +9,7 @@
 
 </div>
 
-[← Back to Module 03](../README.md)
+[← Back to Module 01](../README.md)
 
 ## Overview
 This lab focuses on core **R programming structures** and the fundamentals of **probability and statistical simulation**. It covers conditional logic, control loops (`for`, `while`), custom user-defined functions, database interaction, probability distributions (discrete and continuous), pseudo-random number generation, and stochastic sampling routines in R.
