@@ -23,8 +23,7 @@
 
 | Module | Title | Primary Tech | Core Focus & Applications |
 | :---: | :--- | :---: | :--- |
-| **01** | [`Linear Algebra`](./01_Linear_Algebra/) | `R` | Linear systems, vector spaces, eigenvalues/vectors, SVD (dimensionality reduction), and Markov chains. |
-| **02** | [`Software for Data Analysis`](./02_Software_for_Data_Analysis/) | `R` | Analytical environments, reproducible workflows, data wrangling, and statistical packages. |
+| **01** | [`Software for Data Analysis`](./01_Software_for_Data_Analysis/) | `R` | Analytical environments, reproducible workflows, data wrangling, and statistical packages. |
 
 
 ---
@@ -32,7 +31,7 @@
 ##  Integrated Tech Stack
 
 ```text
-├── Languages & Core      : Python 3.13+, R 4.3+, Processing
-├── Notebooks & Editors   : Jupyter Notebooks (.ipynb), VS Code, RStudio, Processing IDE
+├── Languages & Core      : Python 3.13+, R 4.3+
+├── Notebooks & Editors   : Jupyter Notebooks (.ipynb), VS Code, RStudio
 ├── Environments & Ops    : Miniconda (Conda Environments), PowerShell, Git, GitHub
 └── Data Science & Stats  : Data Lifecycle Labs, Linear Algebra (SVD/Eigenvalues), RMarkdown, ggplot2
