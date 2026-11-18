@@ -1,0 +1,64 @@
+---
+title: "PEC2"
+author: "Marcos Cunchillos Just"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Sección 1. Fundamentos de programación y bases de datos
+##Ejercicio 1. Control de los tiempos de procesamiento
+###1.1. Importe samples.csv en un data frame llamado samples y muestre su estructura. Ejecute as.matrix(samples), indique el tipo de los elementos de la matriz y explique qué estructura conserva mejor los tipos de las columnas.
+```{r}
+samples <- read_csv("samples.csv")
+str(samples)
+
+as.matrix(samples)
+```
+En matriz, todos los elementos tienen que ser del mismo tipo, por lo que el programa a convertido los tiempos (que en el data frame eran numéricos) a caracteres. Por ello, se puede asegurar que el data frame conserva mejor los tipos de columna.
+
+###1.2. Con un bucle for e instrucciones if/else, cree un vector status con una etiqueta por fila: "pending" si el tiempo es NA, "review" si es negativo, "delayed" si supera 90 minutos y "on_time" en los demás casos. Muestre sample_id y status para todas las filas, y cuente los retrasos dentro del mismo bucle. No utilice ifelse(), apply() ni funciones de filtrado para resolver este apartado.
+```{r}
+#Crear bucle 
+status <- c()
+retrasos <- 0
+for(i in 1:nrow(samples)){
+  if(is.na(samples$time_min[i])){
+    status[i] <- "pending"
+  } else if(samples$time_min[i]< 0){
+    status[i] <- "review"
+  } else if(samples$time_min[i] > 90){
+    status[i] <- "delayed"
+    retrasos <- retrasos + 1
+  } else {
+    status[i] <- "on_time"
+  }
+}
+
+estado <- data.frame(samples$sample_id, status)
+
+```
+
+
+###1.3. Repita el recuento de retrasos con un bucle while y compruebe que coincide con el anterior. Explique por qué hay que comprobar is.na() antes de comparar el tiempo con el umbral y cómo se clasifica un tiempo de 90 minutos.
+```{r}
+i <- 1
+retrasos <- 0
+while(i <= nrow(samples)){
+   if(is.na(samples$time_min[i])){
+    status[i] <- "pending"
+  } else if(samples$time_min[i]< 0){
+    status[i] <- "review"
+  } else if(samples$time_min[i] > 90){
+    status[i] <- "delayed"
+    retrasos <- retrasos + 1
+  } else {
+    status[i] <- "on_time"
+  }
+  i <- i + 1 
+}
+```
+
