@@ -1,0 +1,530 @@
+---
+title: "Final deliverable 02: Air-Quality Exposure Monitoring in R (Programming, SQL and Probability)"
+author: "Marcos Cunchillos Just"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
+```
+
+```{r packages, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(DBI)
+library(RSQLite)
+```
+
+## Overview
+
+An independent mini-project that combines the three core skills of the module on
+a small environmental-health scenario: **fine particulate matter (PM2.5)
+monitoring** at five urban sites.
+
+PM2.5 (particles smaller than 2.5 µm) penetrates deep into the lungs and the
+bloodstream, and it is one of the most studied components of the human
+*exposome*. Monitoring networks compare daily readings against a reference
+value; here we use the WHO 24-hour guideline of **15 µg/m³**. A reading
+**exceeds** the guideline when it is *strictly greater* than 15 µg/m³.
+
+| Part | Topic | Main tools |
+|:----:|:------|:-----------|
+| 1 | Data audit, control flow | `for`, `while`, `if`/`else` |
+| 2 | A validated summary function | functions, input checks, Roxygen2 |
+| 3 | SQL queries on the readings | `DBI`, `RSQLite`, `JOIN`, `HAVING` |
+| 4 | Probability and simulation | binomial, Poisson, normal, hypergeometric |
+
+> **Data note.** The dataset is **synthetic** and generated reproducibly below
+> (`set.seed`). It mimics real monitoring problems (missing values, sensor
+> errors, borderline readings) but contains no real measurements.
+
+## Data generation
+
+```{r data}
+set.seed(2026)
+
+sites <- c("Harbour", "Old Town", "Industrial Park", "Hillside", "Riverside")
+median_pm25 <- c(14, 12, 19, 8, 11)          # typical level of each site (ug/m3)
+n_per_site <- 24
+
+readings <- data.frame(
+  reading_id = sprintf("PM%03d", 1:(length(sites) * n_per_site)),
+  site       = rep(sites, each = n_per_site),
+  pm25       = round(rlnorm(length(sites) * n_per_site,
+                            meanlog = log(rep(median_pm25, each = n_per_site)),
+                            sdlog   = 0.45), 1)
+)
+
+# Inject typical data-quality problems
+readings$pm25[c(5, 31, 58, 90)] <- NA        # missing values (sensor offline)
+readings$pm25[c(14, 77)]        <- c(-1.0, -3.2)  # physically impossible (sensor error)
+readings$pm25[40]               <- 15        # borderline reading, exactly at the limit
+readings$pm25[1:3]              <- c(11.2, 8.6, 13.9)  # first days below the limit
+
+sites_info <- data.frame(
+  site      = sites,
+  zone_type = c("Port", "Residential", "Industrial", "Residential", "Residential"),
+  residents = c(12, 35, 4, 9, 21)            # thousands of residents
+)
+```
+
+---
+
+# Part 1. Programming fundamentals
+
+## 1.1 Data audit
+
+> Show the structure of `readings`. Count the missing values and the negative
+> values, and explain why `na.rm = TRUE` is needed for the second count.
+
+```{r audit}
+str(readings)
+
+n_missing  <- sum(is.na(readings$pm25))
+n_negative <- sum(readings$pm25 < 0, na.rm = TRUE)
+
+c(missing = n_missing, negative = n_negative)
+```
+
+A comparison such as `pm25 < 0` returns `NA` for a missing reading, and `sum()`
+of a vector that contains `NA` is `NA`. With `na.rm = TRUE` the missing values
+are skipped, so only real negative readings are counted. The data contain
+`r n_missing` missing and `r n_negative` negative readings out of
+`r nrow(readings)`.
+
+## 1.2 Classification with a `for` loop
+
+> Build a vector `status` with one label per reading: `"missing"` if the value
+> is `NA`, `"sensor_error"` if it is negative, `"exceedance"` if it is strictly
+> above 15 and `"compliant"` otherwise. Count how many readings fall in each
+> category **inside the same loop**, using a named vector as counter.
+
+```{r for-loop}
+limit <- 15
+status <- character(nrow(readings))
+counts <- c(missing = 0, sensor_error = 0, exceedance = 0, compliant = 0)
+
+for (i in seq_len(nrow(readings))) {
+  if (is.na(readings$pm25[i])) {
+    status[i] <- "missing"
+  } else if (readings$pm25[i] < 0) {
+    status[i] <- "sensor_error"
+  } else if (readings$pm25[i] > limit) {
+    status[i] <- "exceedance"
+  } else {
+    status[i] <- "compliant"
+  }
+  counts[status[i]] <- counts[status[i]] + 1
+}
+
+counts
+sum(counts) == nrow(readings)   # every reading belongs to exactly one category
+```
+
+The `is.na()` check must come **first**: any comparison with `NA` returns `NA`,
+and `if (NA)` stops with an error. The borderline reading of exactly 15 µg/m³
+is classified as `compliant`, because the exceedance rule is strictly `> 15`.
+
+## 1.3 First exceedance with a `while` loop
+
+> Use a `while` loop to find the position of the first exceedance and report how
+> many readings were processed before it.
+
+```{r while-loop}
+i <- 1
+while (i <= nrow(readings) && status[i] != "exceedance") {
+  i <- i + 1
+}
+
+if (i <= nrow(readings)) {
+  cat("First exceedance:", readings$reading_id[i],
+      "at", readings$site[i], "with", readings$pm25[i], "ug/m3\n")
+  cat("Readings processed before it:", i - 1, "\n")
+} else {
+  cat("No exceedance found\n")
+}
+```
+
+The condition `i <= nrow(readings)` is written **first** so that, when no
+exceedance exists, the loop stops at the end of the data instead of indexing
+beyond the last row. Unlike a `for` loop, a `while` loop needs the counter to be
+initialised and updated by hand; forgetting `i <- i + 1` would loop forever.
+
+---
+
+# Part 2. A validated summary function
+
+## 2.1 Definition
+
+> Write `exposure_summary(x, limit = 15)`. It receives a vector of PM2.5
+> readings and returns a list with the number of readings, the mean, the median,
+> the 95th percentile and the percentage of readings strictly above `limit`.
+> It must return an informative text message if `x` is not a non-empty numeric
+> vector without missing or negative values, or if `limit` is not a single
+> positive number.
+
+```{r function}
+#' Summarise PM2.5 exposure readings
+#'
+#' @param x Numeric vector of PM2.5 readings (ug/m3). It must be non-empty and
+#'   contain no missing or negative values.
+#' @param limit Single positive number used as the exceedance threshold.
+#'   Defaults to the WHO 24-hour guideline (15 ug/m3).
+#'
+#' @return A list with `n_readings`, `mean`, `median`, `p95` and
+#'   `percent_above` (percentage of readings strictly above `limit`).
+#'   If an input check fails, a character message is returned instead.
+exposure_summary <- function(x, limit = 15) {
+  # Check the readings
+  if (!is.numeric(x) || length(x) == 0) {
+    return("Invalid input: x must be a non-empty numeric vector")
+  }
+  if (anyNA(x) || any(x < 0)) {
+    return("Invalid input: x cannot contain missing or negative values")
+  }
+
+  # Check the limit (type and length first, sign last)
+  if (!is.numeric(limit) || length(limit) != 1 || is.na(limit) || limit <= 0) {
+    return("Invalid input: limit must be a single positive number")
+  }
+
+  list(
+    n_readings    = length(x),
+    mean          = mean(x),
+    median        = median(x),
+    p95           = unname(quantile(x, probs = 0.95)),
+    percent_above = sum(x > limit) * 100 / length(x)
+  )
+}
+```
+
+## 2.2 Applying and testing it
+
+> Apply the function to the valid readings of each site and test the edge cases.
+
+```{r function-use}
+valid_readings <- readings %>%
+  filter(!is.na(pm25), pm25 >= 0)
+
+# One summary per site
+by_site <- t(sapply(split(valid_readings$pm25, valid_readings$site),
+                    function(x) unlist(exposure_summary(x))))
+round(by_site, 2)
+```
+
+```{r function-tests}
+exposure_summary(c(0, 15, 20))               # 15 is not an exceedance
+exposure_summary(c(0, 15, 20), limit = 20)
+exposure_summary(c("a", "b"))                # text
+exposure_summary(numeric(0))                 # empty vector
+exposure_summary(c(5, -2, 8))                # negative value
+exposure_summary(c(5, NA, 8))                # missing value
+exposure_summary(c(5, 8), limit = c(10, 20)) # limit of length 2
+exposure_summary(c(5, 8), limit = -1)        # negative limit
+```
+
+The percentage uses `length(x)` as the denominator, that is, the number of
+**valid readings passed to the function**, not the rows of the original table.
+Here `r nrow(valid_readings)` valid readings enter the summaries, compared with
+`r nrow(readings)` rows in `readings`. With `c(0, 15, 20)` and a limit of 15
+only the 20 exceeds it (1 of 3, 33.3 %).
+
+---
+
+# Part 3. SQL queries
+
+All queries use `dbGetQuery()` and run on the **original** data, including the
+missing and negative readings.
+
+## 3.1 Connection and tables
+
+```{r sql-setup}
+con <- dbConnect(SQLite(), ":memory:")
+dbWriteTable(con, "readings", readings, row.names = FALSE)
+dbWriteTable(con, "sites_info", sites_info, row.names = FALSE)
+
+dbListTables(con)
+dbGetQuery(con, "SELECT COUNT(*) AS n_readings FROM readings")
+```
+
+## 3.2 Exceedances
+
+> List the readings that exceed 15 µg/m³ (`reading_id`, `site`, `pm25`), from the
+> highest to the lowest value; ties are ordered by `reading_id`.
+
+```{r sql-exceedances}
+exceedances <- dbGetQuery(con, "
+  SELECT reading_id, site, pm25
+  FROM readings
+  WHERE pm25 > 15
+  ORDER BY pm25 DESC, reading_id ASC")
+
+head(exceedances, 10)
+nrow(exceedances)
+```
+
+## 3.3 Exceedances per site, with a check
+
+> Count the exceedances per site, ordered by count (descending) and name. Check
+> that the counts add up to the rows of 3.2.
+
+```{r sql-by-site}
+exceed_by_site <- dbGetQuery(con, "
+  SELECT site, COUNT(*) AS n_exceedances
+  FROM readings
+  WHERE pm25 > 15
+  GROUP BY site
+  ORDER BY n_exceedances DESC, site ASC")
+exceed_by_site
+
+sum(exceed_by_site$n_exceedances) == nrow(exceedances)
+```
+
+## 3.4 Exceedance rate with `CASE` and `HAVING`
+
+> For each site, compute the number of valid readings, the mean and the
+> **percentage of valid readings above the limit**. Keep only the sites whose
+> mean is above 12 µg/m³. Valid means non-missing and non-negative.
+
+```{r sql-rate}
+site_stats <- dbGetQuery(con, "
+  SELECT site,
+         COUNT(*)                                             AS n_valid,
+         ROUND(AVG(pm25), 2)                                  AS mean_pm25,
+         ROUND(100.0 * SUM(CASE WHEN pm25 > 15 THEN 1 ELSE 0 END)
+               / COUNT(*), 1)                                 AS pct_exceed
+  FROM readings
+  WHERE pm25 >= 0
+  GROUP BY site
+  HAVING AVG(pm25) > 12
+  ORDER BY pct_exceed DESC")
+site_stats
+```
+
+`WHERE` filters **rows** before grouping (here, the invalid readings), while
+`HAVING` filters **groups** after the aggregation (here, the sites by their
+mean). The `CASE` expression turns each reading into 1 (exceedance) or 0, so its
+sum is the number of exceedances.
+
+## 3.5 Joining a second table
+
+> Using `sites_info`, count the exceedances by zone type.
+
+```{r sql-join}
+exceed_by_zone <- dbGetQuery(con, "
+  SELECT s.zone_type, COUNT(*) AS n_exceedances
+  FROM readings AS r
+  JOIN sites_info AS s ON r.site = s.site
+  WHERE r.pm25 > 15
+  GROUP BY s.zone_type
+  ORDER BY n_exceedances DESC")
+exceed_by_zone
+```
+
+## 3.6 Visualisation and limitation
+
+```{r sql-plot}
+all_sites <- dbGetQuery(con, "
+  SELECT site,
+         COUNT(*) AS n_valid,
+         ROUND(100.0 * SUM(CASE WHEN pm25 > 15 THEN 1 ELSE 0 END)
+               / COUNT(*), 1) AS pct_exceed
+  FROM readings
+  WHERE pm25 >= 0
+  GROUP BY site
+  ORDER BY pct_exceed DESC")
+
+ggplot(all_sites, aes(x = reorder(site, -pct_exceed), y = pct_exceed)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Share of valid readings above the WHO 24-h guideline",
+       x = "Monitoring site",
+       y = "Readings above 15 ug/m3 (%)") +
+  theme_minimal()
+```
+
+```{r sql-values, include=FALSE}
+top    <- all_sites[1, ]
+bottom <- all_sites[nrow(all_sites), ]
+```
+
+**Interpretation.** **`r top$site`** has the highest share of exceedances
+(`r top$pct_exceed` % of its `r top$n_valid` valid readings) and
+**`r bottom$site`** the lowest (`r bottom$pct_exceed` %). The ranking
+follows the typical level assigned to each site when the synthetic data were
+generated, so with real data the same query would be used to identify the
+sites that need attention first.
+
+**Limitation.** The percentages are computed on **valid readings only**, and
+each site loses a different number of readings to missing values and sensor
+errors. A site can look cleaner simply because its worst days were not recorded,
+especially if sensors tend to fail during pollution episodes (data that are
+*not* missing at random). The number of valid readings (`n_valid`) should always
+be reported next to the percentage.
+
+```{r sql-close}
+dbDisconnect(con)
+```
+
+---
+
+# Part 4. Probability and simulation
+
+## 4.1 Binomial model: exceedance days in a month
+
+> At one site, each day exceeds the guideline with probability 0.12,
+> independently of the other days. Over a 30-day month, compute the probability
+> of exactly 5 exceedance days and of 8 or more.
+
+**Model.** Let *X* be the number of exceedance days in 30 days. Then
+*X* ~ B(30, 0.12), assuming a fixed number of days, two outcomes per day
+(exceedance or not), independent days and a constant daily probability. (In
+practice consecutive days are correlated, so this is a simplification.)
+
+```{r binom}
+n_days <- 30
+p_day  <- 0.12
+
+p_exact5   <- dbinom(5, n_days, p_day)
+p_atleast8 <- pbinom(7, n_days, p_day, lower.tail = FALSE)  # P(X >= 8) = 1 - P(X <= 7)
+
+c(exactly_5 = p_exact5, at_least_8 = p_atleast8)
+```
+
+## 4.2 Poisson model: smoke episodes
+
+> Wildfire-smoke episodes affect the area at a constant average rate of 0.8 per
+> month. Compute the probability of no episode in 3 months and of at least 4
+> episodes in 6 months. Justify the parameter of each interval.
+
+**Model.** Let *N* be the number of episodes in an interval. For a homogeneous
+Poisson process, *N* ~ Poisson(λ) with λ = rate × duration, assuming a constant
+rate, independent counts in separate intervals and events occurring one at a
+time.
+
+- 3 months: λ = 0.8 × 3 = 2.4
+- 6 months: λ = 0.8 × 6 = 4.8
+
+```{r pois}
+lambda_3m <- 0.8 * 3
+lambda_6m <- 0.8 * 6
+
+p_none_3m    <- dpois(0, lambda_3m)
+p_atleast4_6 <- ppois(3, lambda_6m, lower.tail = FALSE)     # P(N >= 4) = 1 - P(N <= 3)
+
+c(none_in_3_months = p_none_3m, at_least_4_in_6_months = p_atleast4_6)
+```
+
+## 4.3 Normal model: a station's daily mean
+
+> The daily mean PM2.5 at a station is modelled as N(12, 4²) µg/m³ (mean 12,
+> standard deviation 4). Compute the probability of exceeding 15 µg/m³ and the
+> value exceeded only 5 % of the days.
+
+```{r normal}
+p_exceed_normal <- pnorm(15, mean = 12, sd = 4, lower.tail = FALSE)
+q95_normal      <- qnorm(0.95, mean = 12, sd = 4)
+
+c(P_above_15 = p_exceed_normal, percentile_95 = q95_normal)
+```
+
+For a continuous variable, `P(X > 15) = P(X >= 15)`, so no adjustment of the
+limit is needed (unlike the discrete cases above).
+
+## 4.4 Simulation versus exact values
+
+> Simulate 10,000 repetitions of each model, estimate the five probabilities
+> above and compare them with the exact values. Plot the theoretical
+> probability functions of the two discrete models.
+
+```{r simulation}
+set.seed(11)
+n_rep <- 10000
+
+sim_binom <- rbinom(n_rep, n_days, p_day)
+sim_pois3 <- rpois(n_rep, lambda_3m)
+sim_pois6 <- rpois(n_rep, lambda_6m)
+sim_norm  <- rnorm(n_rep, mean = 12, sd = 4)
+
+comparison <- data.frame(
+  event     = c("X = 5", "X >= 8", "N(3 months) = 0", "N(6 months) >= 4", "Mean > 15"),
+  exact     = c(p_exact5, p_atleast8, p_none_3m, p_atleast4_6, p_exceed_normal),
+  estimated = c(mean(sim_binom == 5), mean(sim_binom >= 8),
+                mean(sim_pois3 == 0), mean(sim_pois6 >= 4),
+                mean(sim_norm > 15))
+)
+comparison$difference <- comparison$estimated - comparison$exact
+comparison[, -1] <- round(comparison[, -1], 4)
+comparison
+```
+
+Each probability is estimated as the **proportion of repetitions** in which the
+event occurs. The largest absolute difference is
+`r max(abs(comparison$difference))`. The estimates are close to the exact values
+but not identical because they are random; they change with the seed and
+converge to the exact values as the number of repetitions grows (law of large
+numbers).
+
+```{r pmf-plot}
+x <- 0:20
+pmf <- rbind(
+  data.frame(model = "Exceedance days in 30 days (Binomial)",
+             count = x, probability = dbinom(x, n_days, p_day),
+             in_event = x >= 8),
+  data.frame(model = "Smoke episodes in 6 months (Poisson)",
+             count = x, probability = dpois(x, lambda_6m),
+             in_event = x >= 4)
+)
+
+ggplot(pmf, aes(x = count, y = probability, fill = in_event)) +
+  geom_col() +
+  facet_wrap(~ model) +
+  scale_fill_manual(values = c(`FALSE` = "steelblue", `TRUE` = "firebrick"),
+                    labels = c("Outside the event", "Inside the event")) +
+  labs(x = "Count", y = "Probability", fill = NULL) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+The red bars are the values that make up each event (8 or more exceedance days;
+at least 4 episodes in six months); the sum of their heights is the probability
+computed in 4.1 and 4.2.
+
+## 4.5 Sampling without replacement: filter cartridges
+
+> A batch holds 50 filter cartridges, 6 of them defective. An inspector draws 8
+> cartridges at random. Estimate by simulation the probability of finding at
+> least 2 defective ones, drawing **without** and **with** replacement, and
+> compare with the exact values. Explain why the binomial model is not exact
+> without replacement.
+
+```{r hypergeom}
+batch <- c(rep(1, 6), rep(0, 44))   # 1 = defective, 0 = good
+
+set.seed(5)
+sim_without <- replicate(10000, sum(sample(batch, 8, replace = FALSE)))
+sim_with    <- replicate(10000, sum(sample(batch, 8, replace = TRUE)))
+
+exact_binom <- pbinom(1, 8, 6 / 50, lower.tail = FALSE)      # with replacement
+exact_hyper <- phyper(1, 6, 44, 8, lower.tail = FALSE)       # without replacement
+
+data.frame(
+  case = c("Without replacement (simulation)", "With replacement (simulation)",
+           "Hypergeometric (exact)", "Binomial (exact)"),
+  probability = round(c(mean(sim_without >= 2), mean(sim_with >= 2),
+                        exact_hyper, exact_binom), 4)
+)
+```
+
+Without replacement, every cartridge drawn leaves the batch, so the composition
+of what remains changes at each draw: after a defective cartridge is removed,
+the probability that the next one is defective drops from 6/50 to 5/49. The
+draws are therefore **not independent** and the probability is **not constant**,
+which violates both binomial assumptions. The exact model is the
+**hypergeometric** distribution (`r round(exact_hyper, 4)`), slightly different
+from the binomial value (`r round(exact_binom, 4)`). The binomial becomes a good
+approximation when the batch is much larger than the sample drawn.
